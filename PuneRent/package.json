@@ -1,0 +1,18 @@
+{
+    "name":"pune-rent",
+    "version":"1.0.0",
+    "private":true,
+    "scripts":{
+        "dev":"next dev",
+        "build":"next build",
+        "start":"next start",
+        "lint":"next lint",
+        "seed":"tsx scripts/seed.ts"
+
+    },
+    "dependencies":{
+        "@react-google-maps/api":"^2.20.6",
+        "@supabase/ssr":"^0.6.1",
+        "@supabase/supabase-js":"^2.49"
+    }
+}

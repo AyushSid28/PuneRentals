@@ -1,63 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 import { hasSupabase, supabaseAdmin } from "@/lib/db/client";
+import { listMapPins } from "@/lib/data/pins";
 import * as store from "@/lib/db/store";
 import { getUserId } from "@/lib/auth";
-import { inPune, roundCoord, societyKey } from "@/lib/services/geo";
+import { inPune, societyKey } from "@/lib/services/geo";
 import { checkOutlier, checkPlausible } from "@/lib/services/outlier";
 import { createObservationSchema } from "@/lib/validators/pin";
 
-function localPins() {
-  return store.listObservations().map((p) => ({
-    id: p.id,
-    lat: roundCoord(p.lat),
-    lng: roundCoord(p.lng),
-    bhk: p.bhk,
-    rent_inr: p.rent_inr,
-    society_name: p.society_name,
-    area_slug: p.area_slug,
-    society_key: p.society_key,
-    source: p.source,
-    status: p.status,
-  }));
-}
-
 export async function GET() {
-  if (hasSupabase()) {
-    try {
-      const db = supabaseAdmin();
-      const { data, error } = await db
-        .from("rent_observations")
-        .select(
-          "id,lat,lng,bhk,rent_inr,society_name,area_slug,society_key,source,status"
-        )
-        .in("status", ["active", "flagged"])
-        .limit(5000);
-
-      // Table missing / not seeded yet → fall back to local seed pins
-      if (error) {
-        console.warn("[pins] Supabase error, using local seed:", error.message);
-        return NextResponse.json({ pins: localPins(), source: "local-seed" });
-      }
-
-      const pins = (data ?? []).map((p) => ({
-        ...p,
-        lat: roundCoord(p.lat),
-        lng: roundCoord(p.lng),
-      }));
-
-      // Empty DB → still show seed so map isn't blank
-      if (!pins.length) {
-        return NextResponse.json({ pins: localPins(), source: "local-seed" });
-      }
-
-      return NextResponse.json({ pins, source: "supabase" });
-    } catch (e) {
-      console.warn("[pins] Supabase threw, using local seed:", e);
-      return NextResponse.json({ pins: localPins(), source: "local-seed" });
-    }
+  try {
+    return NextResponse.json({
+      pins: await listMapPins(),
+      source: hasSupabase() ? "supabase+local-seed" : "local-seed",
+    });
+  } catch (error) {
+    console.warn("[pins] Could not load merged pins:", error);
+    return NextResponse.json(
+      { error: "Could not load pins" },
+      { status: 500 }
+    );
   }
-
-  return NextResponse.json({ pins: localPins(), source: "local-seed" });
 }
 
 export async function POST(req: NextRequest) {

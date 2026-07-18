@@ -174,7 +174,16 @@ async function listObservations(): Promise<RentObservation[]> {
     .in("status", ["active", "flagged"]);
 
   if (error) throw new Error(error.message);
-  return (data ?? []) as RentObservation[];
+
+  const supabaseObservations = (data ?? []) as RentObservation[];
+  const supabaseKeys = new Set(
+    supabaseObservations.map((pin) => `${pin.society_key}:${pin.bhk}`)
+  );
+  const remainingSeeds = seedObservations().filter(
+    (pin) => !supabaseKeys.has(`${pin.society_key}:${pin.bhk}`)
+  );
+
+  return [...supabaseObservations, ...remainingSeeds];
 }
 
 async function listVotes(society_key: string) {

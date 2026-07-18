@@ -4,6 +4,9 @@ import { hasSupabase, supabaseAdmin } from "@/lib/db/client";
 import * as store from "@/lib/db/store";
 import { reportSchema } from "@/lib/validators/pin";
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 export async function POST(req: NextRequest) {
   const body = await req.json();
   const parsed = reportSchema.safeParse(body);
@@ -14,12 +17,19 @@ export async function POST(req: NextRequest) {
   const userId = (await getUserId()) ?? body.user_id ?? null;
 
   if (hasSupabase()) {
+    if (!UUID_RE.test(parsed.data.observation_id)) {
+      return NextResponse.json({ ok: true, reports: 1, local_seed: true });
+    }
+
     const db = supabaseAdmin();
-    await db.from("reports").insert({
+    const { error } = await db.from("reports").insert({
       observation_id: parsed.data.observation_id,
       user_id: userId,
       reason: parsed.data.reason,
     });
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
 
     const { count } = await db
       .from("reports")

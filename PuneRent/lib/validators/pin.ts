@@ -22,6 +22,6 @@ export const voteSchema = z.object({
 });
 
 export const reportSchema = z.object({
-  observation_id: z.string().uuid(),
+  observation_id: z.string().min(1),
   reason: z.string().min(3).max(300),
 });

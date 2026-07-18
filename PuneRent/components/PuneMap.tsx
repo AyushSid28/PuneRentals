@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Map, { Marker, NavigationControl } from "react-map-gl/maplibre";
 import type { MapRef } from "react-map-gl/maplibre";
+import type { MapFilters } from "@/models/filters";
 import type { MapPin } from "@/models/pin";
 
 const PUNE_BOUNDS: [[number, number], [number, number]] = [
@@ -11,8 +12,12 @@ const PUNE_BOUNDS: [[number, number], [number, number]] = [
 ];
 
 const MAP_THEMES = {
-  white: "https://tiles.openfreemap.org/styles/positron",
-  blue: "https://tiles.openfreemap.org/styles/dark",
+  white:
+    process.env.NEXT_PUBLIC_MAP_STYLE_WHITE_URL ??
+    "https://tiles.openfreemap.org/styles/positron",
+  blue:
+    process.env.NEXT_PUBLIC_MAP_STYLE_BLUE_URL ??
+    "https://tiles.openfreemap.org/styles/dark",
 } as const;
 
 type MapTheme = keyof typeof MAP_THEMES;
@@ -111,9 +116,25 @@ function applyBluePalette(map: MapRef["getMap"] extends () => infer T ? T : neve
   }
 }
 
-export default function PuneMap() {
+export default function PuneMap({
+  filters,
+  isPickingLocation = false,
+  onSelect,
+  onPickLocation,
+  refreshKey = 0,
+}: {
+  filters?: MapFilters;
+  isPickingLocation?: boolean;
+  onSelect?: (id: string) => void;
+  onPickLocation?: (location: { lat: number; lng: number }) => void;
+  refreshKey?: number;
+}) {
   const [pins, setPins] = useState<MapPin[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [pickedLocation, setPickedLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [theme, setTheme] = useState<MapTheme>("blue");
+  const [zoom, setZoom] = useState(12);
 
   function handleStyleReady(map: MapRef["getMap"] extends () => infer T ? T : never) {
     if (theme === "blue") {
@@ -122,11 +143,61 @@ export default function PuneMap() {
   }
 
   useEffect(() => {
+    setIsLoading(true);
+    setLoadError(null);
     fetch("/api/pins")
-      .then((response) => response.json())
-      .then((data) => setPins(data.pins ?? []))
-      .catch(console.error);
-  }, []);
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error ?? "Could not load pins");
+        setPins(data.pins ?? []);
+      })
+      .catch((error) => setLoadError(error instanceof Error ? error.message : "Could not load pins"))
+      .finally(() => setIsLoading(false));
+  }, [refreshKey]);
+
+  const filteredPins = pins.filter((pin) => {
+    const query = filters?.query?.trim().toLowerCase();
+    if (
+      query &&
+      !pin.society_name.toLowerCase().includes(query) &&
+      !pin.area_slug.replace("-", " ").toLowerCase().includes(query)
+    ) {
+      return false;
+    }
+    if (filters?.bhk && pin.bhk !== filters.bhk) return false;
+    if (filters?.areaSlug && pin.area_slug !== filters.areaSlug) return false;
+    if (filters?.rentMin && pin.rent_inr < filters.rentMin) return false;
+    if (filters?.rentMax && pin.rent_inr > filters.rentMax) return false;
+    if (filters?.source && pin.source !== filters.source) return false;
+    return true;
+  });
+
+  const clusters = useMemo(() => {
+    if (zoom >= 12.6) {
+      return filteredPins.map((pin) => ({ type: "pin" as const, pin }));
+    }
+
+    const precision = zoom < 11.2 ? 0.06 : 0.035;
+    const grouped = new Map<string, MapPin[]>();
+    for (const pin of filteredPins) {
+      const lat = Math.round(pin.lat / precision) * precision;
+      const lng = Math.round(pin.lng / precision) * precision;
+      const key = `${lat.toFixed(3)}:${lng.toFixed(3)}`;
+      grouped.set(key, [...(grouped.get(key) ?? []), pin]);
+    }
+
+    return Array.from(grouped.values()).map((group) => {
+      if (group.length === 1) return { type: "pin" as const, pin: group[0] };
+      return {
+        type: "cluster" as const,
+        id: group.map((pin) => pin.id).join(":"),
+        count: group.length,
+        lat: group.reduce((sum, pin) => sum + pin.lat, 0) / group.length,
+        lng: group.reduce((sum, pin) => sum + pin.lng, 0) / group.length,
+        pins: group,
+      };
+    });
+  }, [filteredPins, zoom]);
 
   return (
     <Map
@@ -137,35 +208,74 @@ export default function PuneMap() {
       }}
       style={{
         width: "100%",
-        height: "100vh",
+        height: "100%",
       }}
       minZoom={10.5}
       maxBounds={PUNE_BOUNDS}
       mapStyle={MAP_THEMES[theme]}
+      cursor={isPickingLocation ? "crosshair" : "grab"}
+      onClick={(event) => {
+        if (!isPickingLocation) return;
+        const location = {
+          lat: Number(event.lngLat.lat.toFixed(6)),
+          lng: Number(event.lngLat.lng.toFixed(6)),
+        };
+        setPickedLocation(location);
+        onPickLocation?.(location);
+      }}
       onLoad={(event) => handleStyleReady(event.target)}
+      onMove={(event) => setZoom(event.viewState.zoom)}
       onStyleData={(event) => handleStyleReady(event.target)}
     >
       <NavigationControl position="top-right" showCompass={false} />
-      {pins.map((pin) => (
-        <Marker
-          key={pin.id}
-          longitude={pin.lng}
-          latitude={pin.lat}
-          anchor="bottom"
-        >
-          <button
-            type="button"
-            className={`pune-rent-marker ${
-              pin.source === "admin" ? "pune-rent-marker-admin" : ""
-            } ${pin.status === "flagged" ? "pune-rent-marker-flagged" : ""}`}
-            title={`${pin.society_name}, ${pin.area_slug}`}
+      {clusters.map((item) =>
+        item.type === "cluster" ? (
+          <Marker key={item.id} longitude={item.lng} latitude={item.lat} anchor="bottom">
+            <button
+              type="button"
+              className="pune-rent-cluster"
+              onClick={() => onSelect?.(item.pins[0].id)}
+              title={`${item.count} rent observations`}
+            >
+              <strong>{item.count} flats</strong>
+              <span>AVLB {item.pins.filter((pin) => pin.status === "active").length}</span>
+            </button>
+          </Marker>
+        ) : (
+          <Marker
+            key={item.pin.id}
+            longitude={item.pin.lng}
+            latitude={item.pin.lat}
+            anchor="bottom"
           >
-            <span>{pin.bhk}BHK</span>
-            <span className="pune-rent-marker-dot">·</span>
-            <span>{formatRent(pin.rent_inr)}</span>
-          </button>
+            <button
+              type="button"
+              className={`pune-rent-marker ${
+                item.pin.source === "admin" ? "pune-rent-marker-admin" : "pune-rent-marker-community"
+              } ${item.pin.status === "flagged" ? "pune-rent-marker-flagged" : ""}`}
+              onClick={() => onSelect?.(item.pin.id)}
+              title={`${item.pin.society_name}, ${item.pin.area_slug}`}
+            >
+              <span className="pune-rent-marker-badge">
+                {item.pin.source === "admin" ? "EST" : "LIVE"}
+              </span>
+              <span>{item.pin.bhk}BHK</span>
+              <span className="pune-rent-marker-dot">·</span>
+              <span>{formatRent(item.pin.rent_inr)}</span>
+            </button>
+          </Marker>
+        )
+      )}
+      {pickedLocation && (
+        <Marker longitude={pickedLocation.lng} latitude={pickedLocation.lat} anchor="bottom">
+          <div className="picked-location-marker">Selected</div>
         </Marker>
-      ))}
+      )}
+      {isLoading && <div className="map-state-panel">Loading rent pins...</div>}
+      {loadError && <div className="map-state-panel map-state-panel-error">{loadError}</div>}
+      {isPickingLocation && (
+        <div className="map-pick-panel">Click the map to choose this rent's location</div>
+      )}
       <div className="map-theme-toggle" role="group" aria-label="Map theme">
         <button
           type="button"

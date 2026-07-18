@@ -1,0 +1,16 @@
+# Pune.rent runtime requirements
+#
+# This is a Next.js/React project, so install application dependencies with:
+#   cd PuneRent
+#   npm install
+#
+# Required local tools:
+# - Node.js 20 LTS or newer
+# - npm 10 or newer
+#
+# Optional services for full production behavior:
+# - Google Maps JavaScript API key: NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
+# - Supabase project credentials:
+#   NEXT_PUBLIC_SUPABASE_URL
+#   NEXT_PUBLIC_SUPABASE_ANON_KEY
+#   SUPABASE_SERVICE_ROLE_KEY

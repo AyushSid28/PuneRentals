@@ -16,7 +16,7 @@ export function computeBachelorRealityScore(votes:vote[]):BachelorRealityScore{
          breakdown,
          display:"No bachelor data yet - be the first to vote",
       };
-
+     
    }
    const yesPct=breakdown.yes/n;
    const noPct=breakdown.no/n;

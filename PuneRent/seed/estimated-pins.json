@@ -1,0 +1,29 @@
+[
+    {
+        "lat": 18.5912,
+        "lng": 73.7389,
+        "bhk": 2,
+        "rent_inr": 26000,
+        "furnishing": "semi",
+        "society_name": "Blue Ridge",
+        "area_slug": "hinjewadi",
+        "is_gated": true,
+        "deposit_months": 2,
+        "maintainance_inr": 3000,
+        "source": "admin",
+        "confidence": "low"
+    },
+    {
+        "lat": 18.5995,
+        "lng": 73.7629,
+        "bhk": 2,
+        "rent_inr": 24000,
+        "furnishing": "semi",
+        "society_name": "Rohan Ideal",
+        "area_slug": "wakad",
+        "is_gated": true,
+        "deposit_months": 2,
+        "source": "admin",
+        "confidence": "low"
+    }
+]

@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import Map, { Marker, NavigationControl } from "react-map-gl/maplibre";
+import { useEffect, useMemo, useRef, useState } from "react";
+import ReactMap, { Marker, NavigationControl } from "react-map-gl/maplibre";
 import type { MapRef } from "react-map-gl/maplibre";
 import type { MapFilters } from "@/models/filters";
 import type { MapPin } from "@/models/pin";
@@ -118,12 +118,14 @@ function applyBluePalette(map: MapRef["getMap"] extends () => infer T ? T : neve
 
 export default function PuneMap({
   filters,
+  searchedLocation,
   isPickingLocation = false,
   onSelect,
   onPickLocation,
   refreshKey = 0,
 }: {
   filters?: MapFilters;
+  searchedLocation?: { lat: number; lng: number; name: string } | null;
   isPickingLocation?: boolean;
   onSelect?: (id: string) => void;
   onPickLocation?: (location: { lat: number; lng: number }) => void;
@@ -154,6 +156,18 @@ export default function PuneMap({
       .catch((error) => setLoadError(error instanceof Error ? error.message : "Could not load pins"))
       .finally(() => setIsLoading(false));
   }, [refreshKey]);
+
+  const mapRef = useRef<MapRef>(null);
+
+  useEffect(() => {
+    if (searchedLocation && mapRef.current) {
+      mapRef.current.flyTo({
+        center: [searchedLocation.lng, searchedLocation.lat],
+        zoom: 14,
+        duration: 1000
+      });
+    }
+  }, [searchedLocation]);
 
   const filteredPins = pins.filter((pin) => {
     const query = filters?.query?.trim().toLowerCase();
@@ -200,7 +214,8 @@ export default function PuneMap({
   }, [filteredPins, zoom]);
 
   return (
-    <Map
+    <ReactMap
+      ref={mapRef}
       initialViewState={{
         longitude: 73.8567,
         latitude: 18.5204,
@@ -250,9 +265,8 @@ export default function PuneMap({
           >
             <button
               type="button"
-              className={`pune-rent-marker ${
-                item.pin.source === "admin" ? "pune-rent-marker-admin" : "pune-rent-marker-community"
-              } ${item.pin.status === "flagged" ? "pune-rent-marker-flagged" : ""}`}
+              className={`pune-rent-marker ${item.pin.source === "admin" ? "pune-rent-marker-admin" : "pune-rent-marker-community"
+                } ${item.pin.status === "flagged" ? "pune-rent-marker-flagged" : ""}`}
               onClick={() => onSelect?.(item.pin.id)}
               title={`${item.pin.society_name}, ${item.pin.area_slug}`}
             >
@@ -292,6 +306,19 @@ export default function PuneMap({
           Blue
         </button>
       </div>
-    </Map>
+      {searchedLocation && (
+        <Marker longitude={searchedLocation.lng} latitude={searchedLocation.lat} anchor="bottom">
+          <div className="flex flex-col items-center">
+            {/* Red Pin Bubble */}
+            <div className="rounded-full bg-red-600 px-2 py-1 text-[10px] font-bold text-white shadow-lg">
+              {searchedLocation.name}
+            </div>
+            {/* Pin Point */}
+            <div className="h-3 w-0.5 bg-red-600"></div>
+          </div>
+        </Marker>
+      )}
+
+    </ReactMap>
   );
 }

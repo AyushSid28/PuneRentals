@@ -18,6 +18,8 @@ export default function Home() {
   const [toast, setToast] = useState<string | null>(null);
   const [pickedLocation, setPickedLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [isPickingLocation, setIsPickingLocation] = useState(false);
+  const [searchedLocation, setSearchedLocation] = useState<{ lat: number; lng: number; name: string } | null>(null);
+
 
   async function selectPin(id: string) {
     const response = await fetch(`/api/pins/${id}`);
@@ -32,10 +34,11 @@ export default function Home() {
   return (
     <main className="relative h-dvh w-full overflow-hidden bg-neutral-950">
       <Toolbar onOpen={setModal} />
-      <FilterBar filters={filters} onChange={setFilters} />
+      <FilterBar filters={filters} onChange={setFilters} onSearchSelect={setSearchedLocation} />
       <div className="absolute inset-0 top-12">
         <PuneMap
           filters={filters}
+          searchedLocation={searchedLocation}
           isPickingLocation={isPickingLocation}
           refreshKey={refreshKey}
           onPickLocation={(location) => {
@@ -143,18 +146,75 @@ export default function Home() {
 function FilterBar({
   filters,
   onChange,
+  onSearchSelect,
 }: {
   filters: MapFilters;
   onChange: (filters: MapFilters) => void;
+  onSearchSelect: (location: { lat: number; lng: number; name: string } | null) => void;
 }) {
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<any[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+
+  useEffect(() => {
+    if (query.length < 2) {
+      setResults([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const res = await fetch(`/api/v1/search?q=${encodeURIComponent(query)}`);
+        const data = await res.json();
+        setResults(data.results || []);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 400); // Wait 400ms after user stops typing
+    return () => clearTimeout(timer);
+  }, [query]);
+
   return (
     <div className="absolute left-3 right-3 top-14 z-30 flex flex-wrap items-center gap-2 rounded-xl border border-white/10 bg-neutral-950/80 p-2 text-xs text-white shadow-2xl backdrop-blur sm:left-auto">
-      <input
-        value={filters.query ?? ""}
-        onChange={(event) => onChange({ ...filters, query: event.target.value })}
-        placeholder="Search society or area"
-        className="min-w-52 flex-1 rounded-lg border border-white/10 bg-white/10 px-3 py-2 placeholder:text-white/55 sm:flex-none"
-      />
+      <div className="relative min-w-52 flex-1 sm:flex-none">
+        <input
+          value={query}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            if (event.target.value === "") {
+              onSearchSelect(null);
+            }
+          }}
+          placeholder="Search society or landmark..."
+          className="w-full rounded-lg border border-white/10 bg-white/10 px-3 py-2 placeholder:text-white/55"
+        />
+
+        {/* Dropdown Menu */}
+        {results.length > 0 && (
+          <ul className="absolute left-0 right-0 top-full mt-1 max-h-60 overflow-y-auto rounded-lg border border-white/10 bg-neutral-950 shadow-2xl">
+            {results.map((r) => (
+              <li key={`${r.type}-${r.id}`}>
+                <button
+                  type="button"
+                  className="w-full px-3 py-2 text-left hover:bg-white/10"
+                  onClick={() => {
+                    onSearchSelect({ lat: r.lat, lng: r.lng, name: r.name });
+                    setQuery(r.name);
+                    setResults([]);
+                    onChange({ ...filters, query: "" });
+                  }}
+                >
+                  <div className="font-semibold">{r.name}</div>
+                  <div className="text-[10px] text-white/50">{r.subtitle}</div>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
       <select
         value={filters.areaSlug ?? ""}
         onChange={(event) =>
@@ -173,9 +233,8 @@ function FilterBar({
         <button
           key={bhk}
           type="button"
-          className={`rounded-lg px-3 py-2 font-semibold ${
-            filters.bhk === bhk ? "bg-white text-neutral-950" : "bg-white/10"
-          }`}
+          className={`rounded-lg px-3 py-2 font-semibold ${filters.bhk === bhk ? "bg-white text-neutral-950" : "bg-white/10"
+            }`}
           onClick={() =>
             onChange({ ...filters, bhk: filters.bhk === bhk ? null : bhk })
           }
@@ -343,7 +402,14 @@ function PinRentModal({
       return;
     }
     if (!response.ok) {
-      setError(data.error?.formErrors?.[0] ?? data.error ?? "Could not pin rent");
+      const err = data.error;
+      if (typeof err === "string") {
+        setError(err);
+      } else if (err?.formErrors?.[0]) {
+        setError(err.formErrors[0]);
+      } else {
+        setError("Validation failed. Please check your inputs.");
+      }
       return;
     }
 

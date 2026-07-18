@@ -1,0 +1,28 @@
+# Pune.rent V1 — dependencies (npm)
+# Install: npm install
+# Or from this file: npm install $(grep -v '^#' requirements.txt | tr '\n' ' ')
+
+# --- runtime ---
+next@^15.2.0
+react@^19.0.0
+react-dom@^19.0.0
+zod@^3.24.2
+@react-google-maps/api@^2.20.6
+@supabase/supabase-js@^2.49.1
+@supabase/ssr@^0.6.1
+
+# --- dev ---
+typescript@^5.8.2
+@types/node@^22.13.10
+@types/react@^19.0.10
+@types/react-dom@^19.0.4
+tailwindcss@^3.4.17
+postcss@^8.5.3
+autoprefixer@^10.4.20
+tsx@^4.19.3
+
+# --- env (not packages) ---
+# NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=
+# NEXT_PUBLIC_SUPABASE_URL=
+# NEXT_PUBLIC_SUPABASE_ANON_KEY=
+# SUPABASE_SERVICE_ROLE_KEY=

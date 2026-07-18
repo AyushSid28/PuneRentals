@@ -1,0 +1,12 @@
+{
+  "/api/pins/route": "/api/pins",
+  "/api/reports/route": "/api/reports",
+  "/api/pins/[id]/route": "/api/pins/[id]",
+  "/api/v1/pins/[id]/route": "/api/v1/pins/[id]",
+  "/api/v1/votes/route": "/api/v1/votes",
+  "/api/stats/route": "/api/stats",
+  "/api/v1/pins/route": "/api/v1/pins",
+  "/api/votes/route": "/api/votes",
+  "/_not-found/page": "/_not-found",
+  "/page": "/"
+}

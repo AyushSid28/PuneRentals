@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import type { IntelligencePayload } from "@/models/pin";
 
 export function IntelligenceSheet({
@@ -11,104 +12,150 @@ export function IntelligenceSheet({
 }: {
   data: IntelligencePayload;
   onClose: () => void;
-  onPinRent: () => void;
+  onPinRent?: () => void;
   onReport: () => void;
   onVote: (v: "yes" | "no" | "depends") => void;
 }) {
-  const r2 = data.rent_by_bhk["2"];
-  const sample = data.sample_observation;
+  const [selectedFlatId, setSelectedFlatId] = useState<string | null>(null);
+
+  const selectedFlat = selectedFlatId ? data.observations?.find(f => f.id === selectedFlatId) : null;
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-50 max-h-[78vh] overflow-y-auto rounded-t-2xl bg-white p-4 shadow-2xl sm:left-auto sm:right-4 sm:top-20 sm:max-h-[calc(100dvh-6rem)] sm:w-[420px] sm:rounded-2xl">
-      <div className="mb-3 flex items-start justify-between">
-        <div>
-          <h2 className="text-lg font-semibold">{data.society_name}</h2>
-          <p className="text-sm text-neutral-500 capitalize">{data.area_slug.replace("-", " ")}</p>
-          <div className="mt-2 flex flex-wrap gap-2">
-            <span className="rounded-full bg-neutral-100 px-2 py-1 text-xs font-semibold text-neutral-700">
-              {data.meta.estimated_label ? "Estimated" : "Community"}
-            </span>
-            <span className="rounded-full bg-neutral-100 px-2 py-1 text-xs font-semibold text-neutral-700">
-              Confidence {data.meta.confidence}
-            </span>
-            {sample && (
-              <span className="rounded-full bg-neutral-100 px-2 py-1 text-xs font-semibold text-neutral-700">
-                {sample.bhk}BHK sample
-              </span>
-            )}
-          </div>
-        </div>
-        <button onClick={onClose} className="text-neutral-400">✕</button>
-      </div>
+    <div className="fixed inset-0 z-50 pointer-events-none flex items-center justify-center p-4">
+      <div className="pointer-events-auto max-h-[90vh] w-full max-w-[420px] overflow-y-auto rounded-2xl bg-neutral-900 text-neutral-100 p-4 shadow-2xl">
+        {!selectedFlat ? (
+          <>
+            <div className="mb-4 flex items-start justify-between">
+              <div>
+                <h2 className="text-lg font-bold">
+                  📍 {data.observations?.length || 0} flats at {data.society_name}
+                </h2>
+                <p className="mt-1 text-sm text-neutral-400 capitalize">
+                  Too close to show as separate pins — tap one to see details.
+                </p>
+              </div>
+              <button onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-full bg-neutral-800 text-neutral-400 hover:bg-neutral-700">✕</button>
+            </div>
 
-      {data.meta.estimated_label && (
-        <div className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
-          Estimated from public/research data · Low confidence — be the first tenant to confirm
-        </div>
-      )}
+            <div className="space-y-3">
+              {data.observations?.sort((a, b) => a.rent_inr - b.rent_inr).map((flat) => (
+                <button
+                  key={flat.id}
+                  onClick={() => setSelectedFlatId(flat.id)}
+                  className="flex w-full items-center justify-between rounded-xl border border-neutral-700 bg-neutral-800 p-4 text-left hover:bg-neutral-700/80 transition-colors"
+                >
+                  <div className="font-semibold text-white">
+                    ₹{(flat.rent_inr / 1000).toFixed(flat.rent_inr % 1000 === 0 ? 0 : 1)}K <span className="text-neutral-400 font-normal">· {flat.bhk}BHK</span>
+                  </div>
+                  <span className="text-neutral-500">›</span>
+                </button>
+              ))}
+              {(!data.observations || data.observations.length === 0) && (
+                <p className="text-sm text-neutral-500">No flats found for this society.</p>
+              )}
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="mb-6 flex items-start justify-between">
+              <div>
+                <button onClick={() => setSelectedFlatId(null)} className="mb-2 flex items-center text-sm font-semibold text-blue-400 hover:text-blue-300">
+                  <span className="mr-1">‹</span> Back to flats
+                </button>
+                <p className="text-xs text-neutral-400 font-semibold tracking-wider">MONTHLY RENT</p>
+                <h2 className="text-4xl font-bold mt-1">
+                  ₹{selectedFlat.rent_inr.toLocaleString()}
+                </h2>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <span className="rounded-full bg-indigo-900/50 border border-indigo-700 px-3 py-1 text-xs font-semibold text-indigo-300">
+                    • {selectedFlat.bhk} BHK
+                  </span>
+                  <span className="rounded-full bg-amber-900/50 border border-amber-700 px-3 py-1 text-xs font-semibold text-amber-300 capitalize">
+                    • {selectedFlat.furnishing}
+                  </span>
+                  {selectedFlat.maintenance_inr ? (
+                    <span className="rounded-full bg-emerald-900/50 border border-emerald-700 px-3 py-1 text-xs font-semibold text-emerald-300">
+                      • Maint: ₹{selectedFlat.maintenance_inr}
+                    </span>
+                  ) : (
+                    <span className="rounded-full bg-emerald-900/50 border border-emerald-700 px-3 py-1 text-xs font-semibold text-emerald-300">
+                      • Maintenance Included
+                    </span>
+                  )}
+                  {selectedFlat.is_gated ? (
+                    <span className="rounded-full bg-neutral-800 border border-neutral-600 px-3 py-1 text-xs font-semibold text-neutral-300">
+                      • Gated
+                    </span>
+                  ) : (
+                    <span className="rounded-full bg-neutral-800 border border-neutral-600 px-3 py-1 text-xs font-semibold text-neutral-300">
+                      • Not Gated
+                    </span>
+                  )}
+                  {selectedFlat.deposit_months && (
+                    <span className="rounded-full bg-neutral-800 border border-neutral-600 px-3 py-1 text-xs font-semibold text-neutral-300">
+                      • Dep: {selectedFlat.deposit_months}m
+                    </span>
+                  )}
+                </div>
+                <div className="mt-4 text-xs font-semibold text-amber-500">
+                  ◷ Pinned {new Date(selectedFlat.as_of_date).toLocaleDateString()}
+                </div>
+              </div>
+              <button onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-full bg-neutral-800 text-neutral-400 hover:bg-neutral-700">✕</button>
+            </div>
 
-      <section className="rounded-xl border border-neutral-200 p-3">
-        <p className="text-sm font-semibold">{data.bachelor.display}</p>
-        <p className="mt-1 text-xs text-neutral-500">
-          Yes {data.bachelor.breakdown.yes} · No {data.bachelor.breakdown.no} · Depends{" "}
-          {data.bachelor.breakdown.depends}
-        </p>
-      </section>
+            <div className="mt-6 border-t border-neutral-800 pt-6">
+              <div className="mb-4 flex items-center justify-between">
+                <h3 className="text-xs font-semibold tracking-wider text-neutral-400">COMMUNITY RATING</h3>
+                <span className="text-xs text-neutral-500">{data.bachelor.display}</span>
+              </div>
 
-      <h3 className="mt-4 text-sm font-semibold">Rent intelligence</h3>
-      {r2 ? (
-        <div className="mt-2 grid grid-cols-3 gap-2 text-center text-sm">
-          <div className="rounded-xl bg-neutral-50 p-3">
-            <p className="text-xs text-neutral-500">Range</p>
-            <p className="font-semibold">₹{(r2.min / 1000).toFixed(0)}k–₹{(r2.max / 1000).toFixed(0)}k</p>
-          </div>
-          <div className="rounded-xl bg-neutral-50 p-3">
-            <p className="text-xs text-neutral-500">Median</p>
-            <p className="font-semibold">₹{(r2.median / 1000).toFixed(0)}k</p>
-          </div>
-          <div className="rounded-xl bg-neutral-50 p-3">
-            <p className="text-xs text-neutral-500">Count</p>
-            <p className="font-semibold">n={r2.n}</p>
-          </div>
-        </div>
-      ) : (
-        <p className="text-sm text-neutral-500">Not enough 2BHK data yet</p>
-      )}
+              <div className="mb-6">
+                <div className="flex gap-2">
+                  <button onClick={() => onVote("yes")} className="flex-1 rounded-lg bg-neutral-800 border border-neutral-700 py-2 text-sm font-semibold hover:bg-neutral-700">
+                    Vote 🟢
+                  </button>
+                  <button onClick={() => onVote("depends")} className="flex-1 rounded-lg bg-neutral-800 border border-neutral-700 py-2 text-sm font-semibold hover:bg-neutral-700">
+                    Vote 🟡
+                  </button>
+                  <button onClick={() => onVote("no")} className="flex-1 rounded-lg bg-neutral-800 border border-neutral-700 py-2 text-sm font-semibold hover:bg-neutral-700">
+                    Vote 🔴
+                  </button>
+                </div>
+              </div>
 
-      {data.deposit_months_median != null && (
-        <p className="mt-2 text-sm">Deposit ~{data.deposit_months_median} months</p>
-      )}
-      {data.maintenance_median != null && (
-        <p className="text-sm">Maintenance ~₹{data.maintenance_median}/mo</p>
-      )}
+              <div className="mb-4">
+                <h3 className="text-xs font-semibold tracking-wider text-neutral-400">COMMENTS</h3>
+              </div>
 
-      <p className="mt-2 text-xs text-neutral-500">
-        Confidence: {data.meta.confidence} · Community {data.meta.community_n} · Admin{" "}
-        {data.meta.admin_n}
-      </p>
+              {data.reviews[0] ? (
+                <blockquote className="mb-4 rounded-xl bg-neutral-800 p-4 text-sm text-neutral-300 italic">
+                  "{data.reviews[0].body}"
+                </blockquote>
+              ) : (
+                <p className="mb-4 text-sm text-neutral-500">No comments yet — be the first!</p>
+              )}
 
-      {data.reviews[0] && (
-        <blockquote className="mt-3 border-l-2 border-neutral-200 pl-3 text-sm text-neutral-700">
-          {data.reviews[0].body}
-        </blockquote>
-      )}
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Add a comment..."
+                  className="flex-1 rounded-lg bg-neutral-800 border-none px-4 py-2 text-sm text-white placeholder-neutral-500 focus:ring-1 focus:ring-indigo-500 outline-none"
+                  disabled
+                />
+                <button className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold hover:bg-indigo-500" disabled>
+                  Post
+                </button>
+              </div>
 
-      <div className="mt-4 flex flex-wrap gap-2">
-        <button onClick={onPinRent} className="rounded-lg bg-neutral-900 px-3 py-2 text-sm text-white">
-          + Pin my rent
-        </button>
-        <button onClick={() => onVote("yes")} className="rounded-lg border px-3 py-2 text-sm">
-          Vote 🟢
-        </button>
-        <button onClick={() => onVote("depends")} className="rounded-lg border px-3 py-2 text-sm">
-          Vote 🟡
-        </button>
-        <button onClick={() => onVote("no")} className="rounded-lg border px-3 py-2 text-sm">
-          Vote 🔴
-        </button>
-        <button onClick={onReport} className="rounded-lg border border-red-200 px-3 py-2 text-sm text-red-700">
-          Report
-        </button>
+              <div className="mt-6 flex justify-end">
+                <button onClick={onReport} className="text-xs font-semibold text-red-500 hover:text-red-400 underline underline-offset-2">
+                  Report this listing
+                </button>
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

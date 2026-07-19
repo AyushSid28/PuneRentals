@@ -13,15 +13,18 @@ export const createObservationSchema = z.object({
   maintenance_inr: z.number().int().nonnegative().optional(),
   comment: z.string().max(500).optional(),
   confirm_outlier: z.boolean().optional(),
+  user_id: z.string().optional(),
 });
 
 export const voteSchema = z.object({
   society_key: z.string(),
   bachelors_allowed: z.enum(["yes", "no", "depends"]),
   visitors_restricted: z.enum(["yes", "no", "depends"]).optional(),
+  user_id: z.string().optional(),
 });
 
 export const reportSchema = z.object({
   observation_id: z.string().min(1),
   reason: z.string().min(3).max(300),
+  user_id: z.string().optional(),
 });

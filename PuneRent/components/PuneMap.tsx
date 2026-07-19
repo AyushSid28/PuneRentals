@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import ReactMap, { Marker, NavigationControl } from "react-map-gl/maplibre";
 import type { MapRef } from "react-map-gl/maplibre";
 import type { MapFilters } from "@/models/filters";
-import type { MapPin } from "@/models/pin";
+import type { SocietyIntel } from "@/app/api/societies/route";
 
 const PUNE_BOUNDS: [[number, number], [number, number]] = [
   [73.62, 18.3],
@@ -34,9 +34,9 @@ const BLUE_MAP_COLORS = {
   park: "#102820",
 };
 
-function formatRent(rent: number) {
+function formatRent(rent: number | null) {
+  if (rent === null) return "—";
   const rentInThousands = rent / 1000;
-
   return `${Number.isInteger(rentInThousands) ? rentInThousands : rentInThousands.toFixed(1)}K`;
 }
 
@@ -127,11 +127,12 @@ export default function PuneMap({
   filters?: MapFilters;
   searchedLocation?: { lat: number; lng: number; name: string } | null;
   isPickingLocation?: boolean;
+  /** Called with the society UUID when a marker is clicked */
   onSelect?: (id: string) => void;
   onPickLocation?: (location: { lat: number; lng: number }) => void;
   refreshKey?: number;
 }) {
-  const [pins, setPins] = useState<MapPin[]>([]);
+  const [societies, setSocieties] = useState<SocietyIntel[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [pickedLocation, setPickedLocation] = useState<{ lat: number; lng: number } | null>(null);
@@ -144,16 +145,19 @@ export default function PuneMap({
     }
   }
 
+  // ── Data fetching ──────────────────────────────────────────────────────────
   useEffect(() => {
     setIsLoading(true);
     setLoadError(null);
-    fetch("/api/pins")
+    fetch("/api/societies")
       .then(async (response) => {
         const data = await response.json();
-        if (!response.ok) throw new Error(data.error ?? "Could not load pins");
-        setPins(data.pins ?? []);
+        if (!response.ok) throw new Error(data.error ?? "Could not load societies");
+        setSocieties(data.societies ?? []);
       })
-      .catch((error) => setLoadError(error instanceof Error ? error.message : "Could not load pins"))
+      .catch((error) =>
+        setLoadError(error instanceof Error ? error.message : "Could not load societies")
+      )
       .finally(() => setIsLoading(false));
   }, [refreshKey]);
 
@@ -164,54 +168,54 @@ export default function PuneMap({
       mapRef.current.flyTo({
         center: [searchedLocation.lng, searchedLocation.lat],
         zoom: 14,
-        duration: 1000
+        duration: 1000,
       });
     }
   }, [searchedLocation]);
 
-  const filteredPins = pins.filter((pin) => {
+  // ── Client-side filtering ──────────────────────────────────────────────────
+  const filteredSocieties = societies.filter((s) => {
     const query = filters?.query?.trim().toLowerCase();
     if (
       query &&
-      !pin.society_name.toLowerCase().includes(query) &&
-      !pin.area_slug.replace("-", " ").toLowerCase().includes(query)
+      !s.name.toLowerCase().includes(query) &&
+      !s.area_slug.replace("-", " ").toLowerCase().includes(query)
     ) {
       return false;
     }
-    if (filters?.bhk && pin.bhk !== filters.bhk) return false;
-    if (filters?.areaSlug && pin.area_slug !== filters.areaSlug) return false;
-    if (filters?.rentMin && pin.rent_inr < filters.rentMin) return false;
-    if (filters?.rentMax && pin.rent_inr > filters.rentMax) return false;
-    if (filters?.source && pin.source !== filters.source) return false;
+    if (filters?.areaSlug && s.area_slug !== filters.areaSlug) return false;
+    if (filters?.rentMin && (s.median_rent ?? 0) < filters.rentMin) return false;
+    if (filters?.rentMax && (s.median_rent ?? Infinity) > filters.rentMax) return false;
     return true;
   });
 
+  // ── Clustering ────────────────────────────────────────────────────────────
   const clusters = useMemo(() => {
     if (zoom >= 12.6) {
-      return filteredPins.map((pin) => ({ type: "pin" as const, pin }));
+      return filteredSocieties.map((s) => ({ type: "society" as const, society: s }));
     }
 
     const precision = zoom < 11.2 ? 0.06 : 0.035;
-    const grouped = new Map<string, MapPin[]>();
-    for (const pin of filteredPins) {
-      const lat = Math.round(pin.lat / precision) * precision;
-      const lng = Math.round(pin.lng / precision) * precision;
+    const grouped = new Map<string, SocietyIntel[]>();
+    for (const s of filteredSocieties) {
+      const lat = Math.round(s.lat / precision) * precision;
+      const lng = Math.round(s.lng / precision) * precision;
       const key = `${lat.toFixed(3)}:${lng.toFixed(3)}`;
-      grouped.set(key, [...(grouped.get(key) ?? []), pin]);
+      grouped.set(key, [...(grouped.get(key) ?? []), s]);
     }
 
     return Array.from(grouped.values()).map((group) => {
-      if (group.length === 1) return { type: "pin" as const, pin: group[0] };
+      if (group.length === 1) return { type: "society" as const, society: group[0] };
       return {
         type: "cluster" as const,
-        id: group.map((pin) => pin.id).join(":"),
+        id: group.map((s) => s.id).join(":"),
         count: group.length,
-        lat: group.reduce((sum, pin) => sum + pin.lat, 0) / group.length,
-        lng: group.reduce((sum, pin) => sum + pin.lng, 0) / group.length,
-        pins: group,
+        lat: group.reduce((sum, s) => sum + s.lat, 0) / group.length,
+        lng: group.reduce((sum, s) => sum + s.lng, 0) / group.length,
+        societies: group,
       };
     });
-  }, [filteredPins, zoom]);
+  }, [filteredSocieties, zoom]);
 
   return (
     <ReactMap
@@ -260,32 +264,31 @@ export default function PuneMap({
                   });
                 }
               }}
-              title={`${item.count} rent observations`}
+              title={`${item.count} societies`}
             >
-              <strong>{item.count} flats</strong>
-              <span>AVLB {item.pins.filter((pin) => pin.status === "active").length}</span>
+              <strong>{item.count} societies</strong>
+              <span>{item.societies.reduce((sum, s) => sum + (s.total_observations ?? 0), 0)} reports</span>
             </button>
           </Marker>
         ) : (
           <Marker
-            key={item.pin.id}
-            longitude={item.pin.lng}
-            latitude={item.pin.lat}
+            key={item.society.id}
+            longitude={item.society.lng}
+            latitude={item.society.lat}
             anchor="bottom"
           >
             <button
               type="button"
-              className={`pune-rent-marker ${item.pin.source === "admin" ? "pune-rent-marker-admin" : "pune-rent-marker-community"
-                } ${item.pin.status === "flagged" ? "pune-rent-marker-flagged" : ""}`}
-              onClick={() => onSelect?.(item.pin.id)}
-              title={`${item.pin.society_name}, ${item.pin.area_slug}`}
+              className={`pune-rent-marker ${item.society.is_seed ? "pune-rent-marker-admin" : "pune-rent-marker-community"}`}
+              onClick={() => onSelect?.(item.society.id)}
+              title={`${item.society.name}, ${item.society.area_slug}`}
             >
               <span className="pune-rent-marker-badge">
-                {item.pin.source === "admin" ? "EST" : "LIVE"}
+                {item.society.is_seed ? "EST" : "LIVE"}
               </span>
-              <span>{item.pin.bhk}BHK</span>
+              <span>{item.society.name.split(" ")[0]}</span>
               <span className="pune-rent-marker-dot">·</span>
-              <span>{formatRent(item.pin.rent_inr)}</span>
+              <span>{formatRent(item.society.median_rent)}</span>
             </button>
           </Marker>
         )
@@ -295,10 +298,10 @@ export default function PuneMap({
           <div className="picked-location-marker">Selected</div>
         </Marker>
       )}
-      {isLoading && <div className="map-state-panel">Loading rent pins...</div>}
+      {isLoading && <div className="map-state-panel">Loading societies...</div>}
       {loadError && <div className="map-state-panel map-state-panel-error">{loadError}</div>}
       {isPickingLocation && (
-        <div className="map-pick-panel">Click the map to choose this rent's location</div>
+        <div className="map-pick-panel">Click the map to choose this rent&apos;s location</div>
       )}
       <div className="map-theme-toggle" role="group" aria-label="Map theme">
         <button

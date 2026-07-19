@@ -20,6 +20,7 @@ export default function Home() {
   const [searchedLocation, setSearchedLocation] = useState<{ lat: number; lng: number; name: string } | null>(null);
   const [anonymousUserId, setAnonymousUserId] = useState<string>("");
   const [pinPrefill, setPinPrefill] = useState<{ society_name: string; area_slug: string; lat: number; lng: number } | null>(null);
+  const [selectedSocietyId, setSelectedSocietyId] = useState<string | null>(null);
 
   useEffect(() => {
     let id = localStorage.getItem("pune_rent_anonymous_user_id");
@@ -38,14 +39,16 @@ export default function Home() {
   }, []);
 
 
-  async function selectPin(id: string) {
-    const response = await fetch(`/api/pins/${id}`);
+  /** id is always a society UUID coming from PuneMap's onSelect */
+  async function selectSociety(id: string) {
+    const response = await fetch(`/api/societies/${id}`);
     const data = await response.json();
     if (!response.ok) {
       console.error(data);
       return;
     }
     setIntel(data);
+    setSelectedSocietyId(id);
   }
 
   return (
@@ -61,7 +64,7 @@ export default function Home() {
             setPickedLocation(location);
             setModal("pin");
           }}
-          onSelect={selectPin}
+          onSelect={selectSociety}
         />
       </div>
 
@@ -86,8 +89,8 @@ export default function Home() {
               return;
             }
             setToast("Bachelor vote recorded");
-            if (intel.sample_observation?.id) {
-              await selectPin(intel.sample_observation.id);
+            if (selectedSocietyId) {
+              await selectSociety(selectedSocietyId);
             }
           }}
         />
@@ -129,8 +132,8 @@ export default function Home() {
             setModal(null);
             setPinPrefill(null);
             setRefreshKey((key) => key + 1);
-            if (intel?.sample_observation?.id) {
-              selectPin(intel.sample_observation.id);
+            if (selectedSocietyId) {
+              selectSociety(selectedSocietyId);
             }
             setToast("Rent pinned. Map refreshed.");
           }}

@@ -130,8 +130,8 @@ export function IntelligenceSheet({
 
               {data.reviews[0] ? (
                 <blockquote className="mb-4 rounded-xl bg-neutral-800 p-4 text-sm text-neutral-300 italic">
-                  "{data.reviews[0].body}"
-                </blockquote>
+                &ldquo;{data.reviews[0].body}&rdquo;
+              </blockquote>
               ) : (
                 <p className="mb-4 text-sm text-neutral-500">No comments yet — be the first!</p>
               )}

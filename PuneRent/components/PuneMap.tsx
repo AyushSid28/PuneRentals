@@ -228,9 +228,11 @@ export default function PuneMap({
       minZoom={10.5}
       maxBounds={PUNE_BOUNDS}
       mapStyle={MAP_THEMES[theme]}
-      cursor={isPickingLocation ? "crosshair" : "grab"}
-      onClick={(event) => {
-        if (!isPickingLocation) return;
+      dragRotate={false}
+      pitchWithRotate={false}
+      cursor="grab"
+      onContextMenu={(event) => {
+        event.preventDefault(); // Prevent the browser's right-click menu
         const location = {
           lat: Number(event.lngLat.lat.toFixed(6)),
           lng: Number(event.lngLat.lng.toFixed(6)),

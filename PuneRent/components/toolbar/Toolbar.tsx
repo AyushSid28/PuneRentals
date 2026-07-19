@@ -17,13 +17,6 @@ export function Toolbar({
       </button>
       <button
         type="button"
-        onClick={() => onOpen("pin")}
-        className="rounded-md px-2 py-1 text-xs text-neutral-700 hover:bg-neutral-100"
-      >
-        Pin my rent
-      </button>
-      <button
-        type="button"
         onClick={() => onOpen("stats")}
         className="rounded-md px-2 py-1 text-xs text-neutral-700 hover:bg-neutral-100"
       >

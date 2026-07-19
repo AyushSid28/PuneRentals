@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const userId = (await getUserId()) ?? body.user_id ?? null;
+  const userId = (await getUserId()) ?? parsed.data.user_id ?? null;
 
   if (hasSupabase()) {
     if (!UUID_RE.test(parsed.data.observation_id)) {
@@ -22,8 +22,17 @@ export async function POST(req: NextRequest) {
     }
 
     const db = supabaseAdmin();
+
+    // Look up the society_id from the observation being reported
+    const { data: obs } = await db
+      .from("rent_observations")
+      .select("society_id")
+      .eq("id", parsed.data.observation_id)
+      .single();
+
     const { error } = await db.from("reports").insert({
       observation_id: parsed.data.observation_id,
+      society_id: obs?.society_id ?? null,
       user_id: userId,
       reason: parsed.data.reason,
     });

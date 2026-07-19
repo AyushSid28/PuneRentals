@@ -105,9 +105,20 @@ export function IntelligenceSheet({
             </div>
 
             <div className="mt-6 border-t border-neutral-800 pt-6">
-              <div className="mb-4 flex items-center justify-between">
-                <h3 className="text-xs font-semibold tracking-wider text-neutral-400">COMMUNITY RATING</h3>
-                <span className="text-xs text-neutral-500">{data.bachelor.display}</span>
+              <div className="mb-4">
+                <h3 className="text-lg font-bold mb-3">Bachelor Reality</h3>
+                <div className="rounded-xl bg-white/5 p-4 space-y-2 text-sm">
+                  <div className="flex items-center text-lg font-semibold">
+                    <span className="mr-2">{data.bachelor.emoji}</span>
+                    <span className="capitalize">{data.bachelor.label}</span>
+                  </div>
+                  <div className="text-white/70">{data.bachelor.confidence_pct}% confidence</div>
+                  <div className="text-white/70">{data.bachelor.response_count} tenant responses</div>
+                  <div className="pt-2 flex justify-between border-t border-white/10 mt-2">
+                    <span className="text-green-400 font-medium">Allowed: {data.bachelor.breakdown.yes}</span>
+                    <span className="text-red-400 font-medium">Not allowed: {data.bachelor.breakdown.no}</span>
+                  </div>
+                </div>
               </div>
 
               <div className="mb-6">

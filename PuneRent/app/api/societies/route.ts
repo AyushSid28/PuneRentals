@@ -20,6 +20,8 @@ export interface SocietyIntel {
   total_observations: number | null;
   latest_observation_date: string | null; // ISO timestamp
   is_seed?: boolean;
+  bachelor_score?: number | null;
+  bachelor_label?: string;
 }
 
 /**
@@ -39,72 +41,139 @@ export async function GET(req: NextRequest) {
   try {
     const url = new URL(req.url);
     const search = url.searchParams.get("q")?.trim().toLowerCase();
+    const areaSlug = url.searchParams.get("areaSlug")?.trim() || null;
+    const bhkFilter = url.searchParams.get("bhk") ? Number(url.searchParams.get("bhk")) : null;
+    const furnishingFilter = url.searchParams.get("furnishing") || null;
+    const rentMin = url.searchParams.get("rentMin") ? Number(url.searchParams.get("rentMin")) : null;
+    const rentMax = url.searchParams.get("rentMax") ? Number(url.searchParams.get("rentMax")) : null;
+    const bachelorOnly = url.searchParams.get("bachelorOnly") === "true";
 
-    let dbSocieties: SocietyIntel[] = [];
+    let dbSocieties: any[] = [];
+    let dbObs: RentObservation[] = [];
+    let dbVotes: any[] = [];
 
     if (hasSupabase()) {
       const db = supabaseAdmin();
-      let query = db.from("society_intel").select(
-        `id, name, lat, lng, area_slug, median_rent, avg_rent, total_observations, latest_observation_date`
-      );
+      
+      const [socRes, obsRes, voteRes] = await Promise.all([
+        db.from("societies").select("id, name, lat, lng, area_slug"),
+        db.from("rent_observations").select("*").in("status", ["active", "flagged"]),
+        db.from("bachelor_votes").select("society_key, bachelors_allowed")
+      ]);
 
-      if (search) {
-        query = query.ilike("normalized_name", `%${search}%`);
-      }
-
-      const { data, error } = await query.order("name", { ascending: true });
-
-      if (error) {
-        console.warn("[societies] DB error:", error);
-      } else {
-        dbSocieties = (data ?? []) as SocietyIntel[];
-      }
+      if (socRes.data) dbSocieties = socRes.data;
+      if (obsRes.data) dbObs = obsRes.data as RentObservation[];
+      if (voteRes.data) dbVotes = voteRes.data;
     }
 
-    // Merge seeds
-    const dbSocietyKeys = new Set(
-      dbSocieties.map((s) => `${s.name.toLowerCase().trim()}:${s.area_slug}`)
-    );
-    const seeds = seedObservations().filter((o) => o.status === "active");
+    // Prepare seeds
+    const seedObsAll = seedObservations().filter((o) => o.status === "active" || o.status === "flagged");
+    
+    // Merge observations
+    const dbSocKeys = new Set(dbObs.map(o => `${o.society_key}:${o.bhk}`));
+    const activeSeeds = seedObsAll.filter(o => !dbSocKeys.has(`${o.society_key}:${o.bhk}`));
+    const allObs = [...dbObs, ...activeSeeds];
 
-    const seedGroups: Record<string, RentObservation[]> = {};
-    for (const obs of seeds) {
-      if (!seedGroups[obs.society_key]) {
-        seedGroups[obs.society_key] = [];
-      }
-      seedGroups[obs.society_key].push(obs);
+    // Filter observations based on flat-level filters
+    const filteredObs = allObs.filter(o => {
+      if (o.status !== "active") return false;
+      if (bhkFilter && o.bhk !== bhkFilter) return false;
+      if (furnishingFilter && o.furnishing !== furnishingFilter) return false;
+      if (rentMin && o.rent_inr < rentMin) return false;
+      if (rentMax && o.rent_inr > rentMax) return false;
+      return true;
+    });
+
+    // Group observations by society
+    const obsBySociety: Record<string, RentObservation[]> = {};
+    for (const o of filteredObs) {
+      if (!obsBySociety[o.society_key]) obsBySociety[o.society_key] = [];
+      obsBySociety[o.society_key].push(o);
     }
 
-    const mergedSocieties = [...dbSocieties];
-
-    for (const [key, obsList] of Object.entries(seedGroups)) {
-      if (dbSocietyKeys.has(key)) continue;
-
-      const first = obsList[0];
-      if (search && !first.society_name.toLowerCase().includes(search)) continue;
-
-      const rents = obsList.map((o) => o.rent_inr);
-      const sumRent = rents.reduce((a, b) => a + b, 0);
-      const avgRent = rents.length ? Math.round(sumRent / rents.length) : null;
-      const medRent = medianOf(rents);
-
-      mergedSocieties.push({
-        id: first.id, // fake society ID
-        name: first.society_name,
-        lat: first.lat,
-        lng: first.lng,
-        area_slug: first.area_slug,
-        median_rent: medRent,
-        avg_rent: avgRent,
-        total_observations: obsList.length,
-        latest_observation_date: first.as_of_date,
-        is_seed: true,
+    // Merge societies (DB + Seeds)
+    const societyMap = new Map<string, SocietyIntel>();
+    
+    for (const s of dbSocieties) {
+      const key = `${s.name.toLowerCase().trim()}:${s.area_slug}`;
+      societyMap.set(key, {
+        id: s.id,
+        name: s.name,
+        lat: s.lat,
+        lng: s.lng,
+        area_slug: s.area_slug,
+        median_rent: null,
+        avg_rent: null,
+        total_observations: 0,
+        latest_observation_date: null
       });
     }
 
-    mergedSocieties.sort((a, b) => a.name.localeCompare(b.name));
+    for (const o of activeSeeds) {
+      if (!societyMap.has(o.society_key)) {
+        societyMap.set(o.society_key, {
+          id: o.id,
+          name: o.society_name,
+          lat: o.lat,
+          lng: o.lng,
+          area_slug: o.area_slug,
+          median_rent: null,
+          avg_rent: null,
+          total_observations: 0,
+          latest_observation_date: null,
+          is_seed: true
+        });
+      }
+    }
 
-    return NextResponse.json({ societies: mergedSocieties });
+    // Group votes
+    const votesByKey: Record<string, any[]> = {};
+    for (const v of dbVotes) {
+      if (!votesByKey[v.society_key]) votesByKey[v.society_key] = [];
+      votesByKey[v.society_key].push(v);
+    }
+    // Note: if we had local votes, we would merge them here. We can skip local votes for map layer simplicity or fetch them from pins.ts if exposed.
+
+    const { computeSocietyBachelorIntel } = await import("@/lib/services/bachelorScore");
+
+    let finalSocieties: SocietyIntel[] = [];
+
+    for (const [key, s] of societyMap.entries()) {
+      // Apply society-level filters
+      if (areaSlug && s.area_slug !== areaSlug) continue;
+      if (search && !s.name.toLowerCase().includes(search) && !s.area_slug.replace("-", " ").toLowerCase().includes(search)) continue;
+
+      const obsList = obsBySociety[key] || [];
+      
+      // If filters like bhk/rent were applied, and this society has NO matching flats, skip it!
+      // Except if NO observation filters were applied, then we might still want to show empty societies.
+      const hasObsFilters = bhkFilter || furnishingFilter || rentMin || rentMax;
+      if (hasObsFilters && obsList.length === 0) continue;
+
+      const rents = obsList.map(o => o.rent_inr);
+      const sumRent = rents.reduce((a, b) => a + b, 0);
+      s.total_observations = obsList.length;
+      s.avg_rent = rents.length ? Math.round(sumRent / rents.length) : null;
+      s.median_rent = medianOf(rents);
+      s.latest_observation_date = obsList.length ? obsList.reduce((max, o) => o.as_of_date > max ? o.as_of_date : max, "") : null;
+
+      const societyVotes = votesByKey[key] || [];
+      const bachelorIntel = computeSocietyBachelorIntel(s.id, societyVotes);
+      
+      if (bachelorOnly) {
+        if (bachelorIntel.label !== "Friendly") continue;
+      }
+
+      // Add bachelor intel to response object so frontend can use it if needed
+      s.bachelor_score = bachelorIntel.bachelor_score;
+      s.bachelor_label = bachelorIntel.label;
+
+      finalSocieties.push(s);
+    }
+
+    finalSocieties.sort((a, b) => a.name.localeCompare(b.name));
+
+    return NextResponse.json({ societies: finalSocieties });
   } catch (e) {
     console.error("[societies] Unexpected error:", e);
     return NextResponse.json({ error: "Unexpected server error" }, { status: 500 });

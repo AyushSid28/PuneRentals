@@ -149,7 +149,17 @@ export default function PuneMap({
   useEffect(() => {
     setIsLoading(true);
     setLoadError(null);
-    fetch("/api/societies")
+
+    const params = new URLSearchParams();
+    if (filters?.query) params.set("q", filters.query);
+    if (filters?.areaSlug) params.set("areaSlug", filters.areaSlug);
+    if (filters?.bhk) params.set("bhk", filters.bhk.toString());
+    if (filters?.furnishing) params.set("furnishing", filters.furnishing);
+    if (filters?.rentMin) params.set("rentMin", filters.rentMin.toString());
+    if (filters?.rentMax) params.set("rentMax", filters.rentMax.toString());
+    if (filters?.bachelorOnly) params.set("bachelorOnly", "true");
+
+    fetch(`/api/societies?${params.toString()}`)
       .then(async (response) => {
         const data = await response.json();
         if (!response.ok) throw new Error(data.error ?? "Could not load societies");
@@ -159,7 +169,7 @@ export default function PuneMap({
         setLoadError(error instanceof Error ? error.message : "Could not load societies")
       )
       .finally(() => setIsLoading(false));
-  }, [refreshKey]);
+  }, [refreshKey, filters]);
 
   const mapRef = useRef<MapRef>(null);
 
@@ -173,21 +183,8 @@ export default function PuneMap({
     }
   }, [searchedLocation]);
 
-  // ── Client-side filtering ──────────────────────────────────────────────────
-  const filteredSocieties = societies.filter((s) => {
-    const query = filters?.query?.trim().toLowerCase();
-    if (
-      query &&
-      !s.name.toLowerCase().includes(query) &&
-      !s.area_slug.replace("-", " ").toLowerCase().includes(query)
-    ) {
-      return false;
-    }
-    if (filters?.areaSlug && s.area_slug !== filters.areaSlug) return false;
-    if (filters?.rentMin && (s.median_rent ?? 0) < filters.rentMin) return false;
-    if (filters?.rentMax && (s.median_rent ?? Infinity) > filters.rentMax) return false;
-    return true;
-  });
+  // ── Client-side filtering removed since API handles it ──────────────────────
+  const filteredSocieties = societies;
 
   // ── Clustering ────────────────────────────────────────────────────────────
   const clusters = useMemo(() => {

@@ -57,6 +57,16 @@ export type BachelorRealityScore = {
   display: string;
 };
 
+export type SocietyBachelorIntel = {
+  society_id: string;
+  bachelor_score: number | null; // 0-100 score, null if unknown
+  label: "Friendly" | "Conditional" | "Families" | "Unknown";
+  confidence: number; // 0-1
+  total_votes: number;
+  allowed_count: number;
+  not_allowed_count: number;
+};
+
 export type IntelligencePayload = {
   society_name: string;
   area_slug: string;

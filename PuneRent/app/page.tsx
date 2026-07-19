@@ -162,7 +162,65 @@ export default function Home() {
           </button>
         </div>
       )}
+      {filters.areaSlug && <AreaIntelligencePanel areaSlug={filters.areaSlug} />}
     </main>
+  );
+}
+
+function AreaIntelligencePanel({ areaSlug }: { areaSlug: string }) {
+  const [data, setData] = useState<any>(null);
+
+  useEffect(() => {
+    fetch(`/api/areas/${areaSlug}`)
+      .then(res => res.json())
+      .then(d => setData(d))
+      .catch(console.error);
+  }, [areaSlug]);
+
+  if (!data) return null;
+
+  return (
+    <div className="absolute bottom-20 left-4 z-40 w-72 rounded-2xl border border-white/10 bg-neutral-950/90 p-4 text-white shadow-2xl backdrop-blur">
+      <h3 className="mb-2 text-lg font-bold capitalize">{data.area.replace("-", " ")} Area</h3>
+      
+      <div className="mb-4 grid grid-cols-2 gap-2 text-sm">
+        <div className="rounded-lg bg-white/5 p-2">
+          <div className="text-white/50">Median Rent</div>
+          <div className="text-lg font-semibold">₹{data.median_rent?.toLocaleString() ?? "—"}</div>
+        </div>
+        <div className="rounded-lg bg-white/5 p-2">
+          <div className="text-white/50">Societies</div>
+          <div className="text-lg font-semibold">{data.total_societies}</div>
+        </div>
+      </div>
+
+      {Object.keys(data.rent_by_bhk || {}).length > 0 && (
+        <div className="mb-4 space-y-1 text-sm">
+          <div className="text-white/50">Rent by BHK</div>
+          {Object.entries(data.rent_by_bhk).map(([bhk, range]: [string, any]) => (
+            <div key={bhk} className="flex justify-between border-t border-white/5 pt-1">
+              <span>{bhk} BHK</span>
+              <span className="font-medium">₹{range.min.toLocaleString()} - ₹{range.max.toLocaleString()}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {data.bachelor_score !== null && (
+        <div className="rounded-lg bg-white/5 p-2 text-sm">
+          <div className="flex justify-between">
+            <span className="text-white/50">Bachelor Friendly</span>
+            <span className="font-semibold">{data.bachelor_score}%</span>
+          </div>
+          <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-white/10">
+            <div 
+              className={`h-full ${data.bachelor_score >= 70 ? "bg-green-500" : data.bachelor_score >= 40 ? "bg-yellow-500" : "bg-red-500"}`} 
+              style={{ width: `${data.bachelor_score}%` }} 
+            />
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -303,6 +361,31 @@ function FilterBar({
         placeholder="Max rent"
         className="w-24 rounded-lg border border-white/10 bg-white/10 px-2 py-2 placeholder:text-white/55"
       />
+      <select
+        value={filters.furnishing ?? ""}
+        onChange={(event) =>
+          onChange({
+            ...filters,
+            furnishing: (event.target.value || null) as MapFilters["furnishing"],
+          })
+        }
+        className="rounded-lg border border-white/10 bg-white/10 px-2 py-2"
+      >
+        <option value="">All furnishing</option>
+        <option value="unfurnished">Unfurnished</option>
+        <option value="semi">Semi</option>
+        <option value="fully">Fully</option>
+      </select>
+      <button
+        type="button"
+        className={`rounded-lg px-3 py-2 font-semibold ${filters.bachelorOnly ? "bg-white text-neutral-950" : "bg-white/10"
+          }`}
+        onClick={() =>
+          onChange({ ...filters, bachelorOnly: !filters.bachelorOnly })
+        }
+      >
+        Bachelor Friendly Only
+      </button>
       <button
         type="button"
         className="rounded-lg bg-white/10 px-3 py-2 font-semibold"

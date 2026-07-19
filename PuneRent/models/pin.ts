@@ -64,6 +64,16 @@ export type IntelligencePayload = {
   sample_observation?: MapPin;
   rent_by_bhk: Record<string, RentRange>;
   rent_by_furnishing?: Record<string, RentRange>;
+  observations?: {
+    id: string;
+    bhk: number;
+    rent_inr: number;
+    furnishing: string;
+    deposit_months: number | null;
+    maintenance_inr: number | null;
+    is_gated: boolean | null;
+    as_of_date: string;
+  }[];
   deposit_months_median: number | null;
   maintenance_median: number | null;
   bachelor: BachelorRealityScore;

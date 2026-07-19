@@ -17,9 +17,9 @@ export default function Home() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [toast, setToast] = useState<string | null>(null);
   const [pickedLocation, setPickedLocation] = useState<{ lat: number; lng: number } | null>(null);
-  const [isPickingLocation, setIsPickingLocation] = useState(false);
   const [searchedLocation, setSearchedLocation] = useState<{ lat: number; lng: number; name: string } | null>(null);
   const [anonymousUserId, setAnonymousUserId] = useState<string>("");
+  const [pinPrefill, setPinPrefill] = useState<{ society_name: string; area_slug: string; lat: number; lng: number } | null>(null);
 
   useEffect(() => {
     let id = localStorage.getItem("pune_rent_anonymous_user_id");
@@ -56,23 +56,19 @@ export default function Home() {
         <PuneMap
           filters={filters}
           searchedLocation={searchedLocation}
-          isPickingLocation={isPickingLocation}
           refreshKey={refreshKey}
           onPickLocation={(location) => {
             setPickedLocation(location);
-            setIsPickingLocation(false);
             setModal("pin");
-            setToast("Location selected");
           }}
           onSelect={selectPin}
         />
       </div>
 
-      {intel && (
+      {intel && modal !== "pin" && (
         <IntelligenceSheet
           data={intel}
           onClose={() => setIntel(null)}
-          onPinRent={() => setModal("pin")}
           onReport={() => setModal("report")}
           onVote={async (vote) => {
             const response = await fetch("/api/votes", {
@@ -122,17 +118,20 @@ export default function Home() {
       )}
       {modal === "pin" && (
         <PinRentModal
+          prefill={pinPrefill}
           anonymousUserId={anonymousUserId}
           pickedLocation={pickedLocation}
-          onClose={() => setModal(null)}
-          onStartPickLocation={() => {
+          onClose={() => {
             setModal(null);
-            setIsPickingLocation(true);
-            setToast("Click the map where this society is located");
+            setPinPrefill(null);
           }}
           onCreated={() => {
             setModal(null);
+            setPinPrefill(null);
             setRefreshKey((key) => key + 1);
+            if (intel?.sample_observation?.id) {
+              selectPin(intel.sample_observation.id);
+            }
             setToast("Rent pinned. Map refreshed.");
           }}
         />
@@ -322,7 +321,7 @@ function SimpleModal({
   children: React.ReactNode;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/45 p-4 sm:items-center">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
       <section className="w-full max-w-md rounded-xl bg-white p-4 text-sm text-neutral-700 shadow-2xl">
         <div className="mb-3 flex items-center justify-between gap-3">
           <h2 className="text-base font-semibold text-neutral-950">{title}</h2>
@@ -370,17 +369,17 @@ function StatsOverlay({ onClose }: { onClose: () => void }) {
 }
 
 function PinRentModal({
+  prefill,
   anonymousUserId,
   pickedLocation,
   onClose,
   onCreated,
-  onStartPickLocation,
 }: {
+  prefill?: { society_name: string; area_slug: string; lat: number; lng: number } | null;
   anonymousUserId: string;
   pickedLocation: { lat: number; lng: number } | null;
   onClose: () => void;
   onCreated: () => void;
-  onStartPickLocation: () => void;
 }) {
   const [error, setError] = useState<string | null>(null);
   const [confirmOutlier, setConfirmOutlier] = useState(false);
@@ -443,24 +442,35 @@ function PinRentModal({
   return (
     <SimpleModal title="Pin my rent" onClose={onClose}>
       <form className="space-y-3" onSubmit={submit}>
-        <input name="society_name" required placeholder="Society name" className="w-full rounded-lg border px-3 py-2" />
-        <select name="area_slug" required className="w-full rounded-lg border px-3 py-2">
-          <option value="">Area</option>
-          {PHASE1_AREAS.map((area) => (
-            <option key={area.slug} value={area.slug}>{area.name}</option>
-          ))}
-        </select>
+        {prefill ? (
+          <>
+            <div className="rounded-lg bg-neutral-100 p-3 text-sm text-neutral-600">
+              Pinning rent at <strong>{prefill.society_name}</strong>
+            </div>
+            <input type="hidden" name="society_name" value={prefill.society_name} />
+            <input type="hidden" name="area_slug" value={prefill.area_slug} />
+            <input type="hidden" name="lat" value={prefill.lat} />
+            <input type="hidden" name="lng" value={prefill.lng} />
+          </>
+        ) : (
+          <>
+            <input name="society_name" required placeholder="Society name" className="w-full rounded-lg border px-3 py-2" />
+            <select name="area_slug" required className="w-full rounded-lg border px-3 py-2">
+              <option value="">Area</option>
+              {PHASE1_AREAS.map((area) => (
+                <option key={area.slug} value={area.slug}>{area.name}</option>
+              ))}
+            </select>
+            <input type="hidden" name="lat" value={pickedLocation?.lat ?? ""} />
+            <input type="hidden" name="lng" value={pickedLocation?.lng ?? ""} />
+          </>
+        )}
         <div className="grid grid-cols-2 gap-2">
-          <input name="lat" required type="number" step="0.000001" defaultValue={pickedLocation?.lat ?? ""} placeholder="Latitude" className="rounded-lg border px-3 py-2" />
-          <input name="lng" required type="number" step="0.000001" defaultValue={pickedLocation?.lng ?? ""} placeholder="Longitude" className="rounded-lg border px-3 py-2" />
           <select name="bhk" required className="rounded-lg border px-3 py-2">
             {[1, 2, 3, 4, 5].map((bhk) => <option key={bhk} value={bhk}>{bhk} BHK</option>)}
           </select>
           <input name="rent_inr" required type="number" min="1" placeholder="Rent / month" className="rounded-lg border px-3 py-2" />
         </div>
-        <button type="button" onClick={onStartPickLocation} className="w-full rounded-lg border border-neutral-300 px-3 py-2 font-semibold text-neutral-700">
-          Pick location on map
-        </button>
         <select name="furnishing" required className="w-full rounded-lg border px-3 py-2">
           <option value="semi">Semi furnished</option>
           <option value="fully">Fully furnished</option>

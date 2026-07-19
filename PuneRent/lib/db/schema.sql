@@ -7,9 +7,58 @@ create table if not exists public.profiles (
   created_at timestamptz not null default now()
 );
 
-create table if not exists public.rent_observations (
+create table if not exists public.societies (
   id uuid primary key default gen_random_uuid(),
-  user_id uuid references public.profiles(id),
+  name text not null,
+  normalized_name text generated always as (lower(trim(name))) stored,
+  area_slug text not null,
+  lat double precision not null,
+  lng double precision not null,
+  status text not null default 'active' check (status in ('active', 'pending', 'flagged', 'hidden')),
+  source text not null default 'community' check (source in ('community', 'admin')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+-- Composite unique constraint for societies
+create unique index if not exists idx_societies_unique on public.societies(normalized_name, area_slug);
+
+-- Index for case‑insensitive search on normalized_name
+create index if not exists idx_societies_normalized_name on public.societies(normalized_name);
+
+-- Trigger to keep updated_at current on row changes
+create or replace function public.update_society_timestamp()
+returns trigger language plpgsql as $$
+begin
+  new.updated_at := now();
+  return new;
+end;
+$$;
+
+create trigger trg_update_society_timestamp
+before update on public.societies
+for each row execute function public.update_society_timestamp();
+
+-- Add foreign key to observations
+alter table public.rent_observations add column if not exists society_id uuid references public.societies(id);
+
+-- Add foreign key to votes
+alter table public.bachelor_votes add column if not exists society_id uuid references public.societies(id);
+
+-- Index for society_id on votes
+create index if not exists idx_votes_society_id on public.bachelor_votes(society_id);
+
+-- Add foreign key to reviews
+alter table public.reviews add column if not exists society_id uuid references public.societies(id);
+
+-- Index for society_id on reviews
+create index if not exists idx_reviews_society_id on public.reviews(society_id);
+
+-- Add foreign key to reports (reference to observation already has observation_id, but add society reference for convenience)
+alter table public.reports add column if not exists society_id uuid references public.societies(id);
+
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid,
   lat double precision not null,
   lng double precision not null,
   bhk smallint not null check (bhk between 1 and 5),
@@ -32,11 +81,22 @@ create table if not exists public.rent_observations (
 
 create index if not exists idx_obs_area on public.rent_observations(area_slug) where status = 'active';
 create index if not exists idx_obs_society_key on public.rent_observations(society_key) where status = 'active';
+create index if not exists idx_obs_society_id on public.rent_observations(society_id) where status = 'active';
+create index if not exists idx_obs_society_key on public.rent_observations(society_key) where status = 'active';
 
 create table if not exists public.bachelor_votes (
   id uuid primary key default gen_random_uuid(),
   society_key text not null,
-  user_id uuid not null references public.profiles(id),
+  society_id uuid references public.societies(id),
+  user_id uuid not null,
+  bachelors_allowed text not null check (bachelors_allowed in ('yes', 'no', 'depends')),
+  visitors_restricted text check (visitors_restricted in ('yes', 'no', 'depends')),
+  created_at timestamptz not null default now(),
+  unique (society_key, user_id)
+);
+  id uuid primary key default gen_random_uuid(),
+  society_key text not null,
+  user_id uuid not null,
   bachelors_allowed text not null check (bachelors_allowed in ('yes', 'no', 'depends')),
   visitors_restricted text check (visitors_restricted in ('yes', 'no', 'depends')),
   created_at timestamptz not null default now(),
@@ -46,7 +106,15 @@ create table if not exists public.bachelor_votes (
 create table if not exists public.reviews (
   id uuid primary key default gen_random_uuid(),
   society_key text not null,
-  user_id uuid not null references public.profiles(id),
+  society_id uuid references public.societies(id),
+  user_id uuid not null,
+  body text not null check (char_length(body) <= 500),
+  owner_strictness smallint check (owner_strictness between 1 and 5),
+  created_at timestamptz not null default now()
+);
+  id uuid primary key default gen_random_uuid(),
+  society_key text not null,
+  user_id uuid not null,
   body text not null check (char_length(body) <= 500),
   owner_strictness smallint check (owner_strictness between 1 and 5),
   created_at timestamptz not null default now()
@@ -55,7 +123,14 @@ create table if not exists public.reviews (
 create table if not exists public.reports (
   id uuid primary key default gen_random_uuid(),
   observation_id uuid not null references public.rent_observations(id) on delete cascade,
-  user_id uuid references public.profiles(id),
+  society_id uuid references public.societies(id),
+  user_id uuid,
+  reason text not null,
+  created_at timestamptz not null default now()
+);
+  id uuid primary key default gen_random_uuid(),
+  observation_id uuid not null references public.rent_observations(id) on delete cascade,
+  user_id uuid,
   reason text not null,
   created_at timestamptz not null default now()
 );

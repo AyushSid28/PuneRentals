@@ -249,7 +249,15 @@ export default function PuneMap({
             <button
               type="button"
               className="pune-rent-cluster"
-              onClick={() => onSelect?.(item.pins[0].id)}
+              onClick={() => {
+                if (mapRef.current) {
+                  mapRef.current.flyTo({
+                    center: [item.lng, item.lat],
+                    zoom: Math.min(zoom + 2, 16),
+                    duration: 1000,
+                  });
+                }
+              }}
               title={`${item.count} rent observations`}
             >
               <strong>{item.count} flats</strong>

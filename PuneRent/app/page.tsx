@@ -19,6 +19,23 @@ export default function Home() {
   const [pickedLocation, setPickedLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [isPickingLocation, setIsPickingLocation] = useState(false);
   const [searchedLocation, setSearchedLocation] = useState<{ lat: number; lng: number; name: string } | null>(null);
+  const [anonymousUserId, setAnonymousUserId] = useState<string>("");
+
+  useEffect(() => {
+    let id = localStorage.getItem("pune_rent_anonymous_user_id");
+    if (!id) {
+      if (typeof window !== "undefined" && window.crypto?.randomUUID) {
+        id = window.crypto.randomUUID();
+      } else {
+        id = "f0000000-0000-0000-0000-000000000000".replace(/[f0]/g, (c) => {
+          const r = (Math.random() * 16) | 0;
+          return (c === "f" ? r : (r & 0x3) | 0x8).toString(16);
+        });
+      }
+      localStorage.setItem("pune_rent_anonymous_user_id", id);
+    }
+    setAnonymousUserId(id);
+  }, []);
 
 
   async function selectPin(id: string) {
@@ -64,10 +81,12 @@ export default function Home() {
               body: JSON.stringify({
                 society_key: intel.society_key,
                 bachelors_allowed: vote,
+                user_id: anonymousUserId,
               }),
             });
             if (!response.ok) {
-              setToast("Vote needs real auth before it can save to Supabase");
+              const errData = await response.json().catch(() => ({}));
+              setToast(errData.error ?? "Failed to record vote");
               return;
             }
             setToast("Bachelor vote recorded");
@@ -103,6 +122,7 @@ export default function Home() {
       )}
       {modal === "pin" && (
         <PinRentModal
+          anonymousUserId={anonymousUserId}
           pickedLocation={pickedLocation}
           onClose={() => setModal(null)}
           onStartPickLocation={() => {
@@ -119,6 +139,7 @@ export default function Home() {
       )}
       {modal === "report" && intel?.sample_observation?.id && (
         <ReportModal
+          anonymousUserId={anonymousUserId}
           observationId={intel.sample_observation.id}
           onClose={() => setModal(null)}
           onReported={() => {
@@ -349,11 +370,13 @@ function StatsOverlay({ onClose }: { onClose: () => void }) {
 }
 
 function PinRentModal({
+  anonymousUserId,
   pickedLocation,
   onClose,
   onCreated,
   onStartPickLocation,
 }: {
+  anonymousUserId: string;
   pickedLocation: { lat: number; lng: number } | null;
   onClose: () => void;
   onCreated: () => void;
@@ -386,6 +409,7 @@ function PinRentModal({
       is_gated: form.get("is_gated") === "on",
       comment: String(form.get("comment") ?? "") || undefined,
       confirm_outlier: confirmOutlier,
+      user_id: anonymousUserId,
     };
 
     const response = await fetch("/api/pins", {
@@ -461,10 +485,12 @@ function PinRentModal({
 }
 
 function ReportModal({
+  anonymousUserId,
   observationId,
   onClose,
   onReported,
 }: {
+  anonymousUserId: string;
   observationId: string;
   onClose: () => void;
   onReported: () => void;
@@ -483,6 +509,7 @@ function ReportModal({
       body: JSON.stringify({
         observation_id: observationId,
         reason: String(form.get("reason") ?? ""),
+        user_id: anonymousUserId,
       }),
     });
     const data = await response.json();

@@ -14,8 +14,8 @@ export async function POST(req: NextRequest) {
   const userId = (await getUserId()) ?? body.user_id;
   if (!userId) {
     return NextResponse.json(
-      { error: "Auth required (sign in or pass user_id for local demo)" },
-      { status: 401 }
+      { error: "Missing user_id parameter" },
+      { status: 400 }
     );
   }
 

@@ -119,12 +119,12 @@ INFRA
 MAP
 [x] Full-screen map · seeded pins day 1
 [x] Tap → sheet (ranges + Bachelor Reality Score + meta)
-[ ] Clusters
+[x] Clusters
 
 WRITE + TRUST
-[~] Google auth · pin observation
-[~] Bachelor vote → score + confidence copy
-[~] Outlier soft-flag · report hide threshold
+[x] Client-side anonymous tracking · pin observation (Auth removed)
+[x] Bachelor vote → score + confidence copy
+[x] Outlier soft-flag · report hide threshold
 [x] Estimated vs community labels
 
 POLISH
@@ -201,7 +201,7 @@ pune-rent/
 
 | Version | Status | Notes |
 | --- | --- | --- |
-| **V1** | `IN PROGRESS` | Core one-page MapLibre MVP wired: seeded/Supabase pins, map tap → intelligence sheet, pin-rent form, basic filters, report action, live stats, FAQ/tour shells. Remaining: real auth, clusters, richer filters, deploy polish. |
+| **V1** | `IN PROGRESS` | Core one-page MapLibre MVP wired: seeded/Supabase pins, map tap → intelligence sheet, pin-rent form, basic filters, report action, live stats, FAQ/tour shells. Remaining: clusters, richer filters, deploy polish (Auth removed). |
 | **V2** | `BLOCKED on V1` | |
 | **V3** | `BLOCKED on V2` | |
 

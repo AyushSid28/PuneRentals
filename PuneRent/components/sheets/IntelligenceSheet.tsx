@@ -44,8 +44,14 @@ export function IntelligenceSheet({
                   onClick={() => setSelectedFlatId(flat.id)}
                   className="flex w-full items-center justify-between rounded-xl border border-neutral-700 bg-neutral-800 p-4 text-left hover:bg-neutral-700/80 transition-colors"
                 >
-                  <div className="font-semibold text-white">
-                    ₹{(flat.rent_inr / 1000).toFixed(flat.rent_inr % 1000 === 0 ? 0 : 1)}K <span className="text-neutral-400 font-normal">· {flat.bhk}BHK</span>
+                  <div className="font-semibold text-white flex items-center gap-2">
+                    <span>₹{(flat.rent_inr / 1000).toFixed(flat.rent_inr % 1000 === 0 ? 0 : 1)}K</span>
+                    <span className="text-neutral-400 font-normal">· {flat.bhk}BHK</span>
+                    {flat.is_outlier && (
+                      <span className="text-xs font-medium text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
+                        ⚠️ {flat.outlier_label || "Unusual price"}
+                      </span>
+                    )}
                   </div>
                   <span className="text-neutral-500">›</span>
                 </button>
@@ -63,8 +69,13 @@ export function IntelligenceSheet({
                   <span className="mr-1">‹</span> Back to flats
                 </button>
                 <p className="text-xs text-neutral-400 font-semibold tracking-wider">MONTHLY RENT</p>
-                <h2 className="text-4xl font-bold mt-1">
-                  ₹{selectedFlat.rent_inr.toLocaleString()}
+                <h2 className="text-4xl font-bold mt-1 flex items-center gap-3">
+                  <span>₹{selectedFlat.rent_inr.toLocaleString()}</span>
+                  {selectedFlat.is_outlier && (
+                    <span className="text-sm font-medium text-amber-500 bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20 mt-1">
+                      ⚠️ {selectedFlat.outlier_label || "Unusual price"}
+                    </span>
+                  )}
                 </h2>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <span className="rounded-full bg-indigo-900/50 border border-indigo-700 px-3 py-1 text-xs font-semibold text-indigo-300">

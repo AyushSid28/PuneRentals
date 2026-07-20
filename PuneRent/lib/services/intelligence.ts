@@ -40,16 +40,45 @@ export function buildIntelligence(
       : undefined,
     rent_by_bhk: groupRentByBhk(observations),
     rent_by_furnishing: groupRentByFurnishing(observations, 2),
-    observations: u.map(o => ({
-      id: o.id,
-      bhk: o.bhk,
-      rent_inr: o.rent_inr,
-      furnishing: o.furnishing,
-      deposit_months: o.deposit_months,
-      maintenance_inr: o.maintenance_inr,
-      is_gated: o.is_gated,
-      as_of_date: o.as_of_date,
-    })),
+    observations: u.map(o => {
+      let is_outlier = false;
+      let outlier_label: string | undefined = undefined;
+
+      // Filter other observations for same BHK
+      const sameBhk = u.filter(other => other.bhk === o.bhk);
+      
+      // Minimum 3 observations to form a baseline
+      if (sameBhk.length >= 3) {
+        // Prefer same furnishing if available (at least 3)
+        let baselineObs = sameBhk.filter(other => other.furnishing === o.furnishing);
+        if (baselineObs.length < 3) {
+          baselineObs = sameBhk;
+        }
+
+        const baselineRents = baselineObs.map(other => other.rent_inr);
+        const baselineMedian = medianOf(baselineRents);
+
+        if (baselineMedian && baselineMedian > 0) {
+          const deviation = Math.abs(o.rent_inr - baselineMedian) / baselineMedian;
+          if (deviation >= 0.35) {
+            is_outlier = true;
+            outlier_label = "Unusual price";
+          }
+        }
+      }
+
+      return {
+        id: o.id,
+        bhk: o.bhk,
+        rent_inr: o.rent_inr,
+        furnishing: o.furnishing,
+        deposit_months: o.deposit_months,
+        maintenance_inr: o.maintenance_inr,
+        is_gated: o.is_gated,
+        as_of_date: o.as_of_date,
+        ...(is_outlier ? { is_outlier, outlier_label } : {})
+      };
+    }),
     deposit_months_median: medianOf(u.map((o) => o.deposit_months)),
     maintenance_median: medianOf(u.map((o) => o.maintenance_inr)),
     bachelor: computeBachelorRealityScore(votes),

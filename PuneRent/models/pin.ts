@@ -83,6 +83,8 @@ export type IntelligencePayload = {
     maintenance_inr: number | null;
     is_gated: boolean | null;
     as_of_date: string;
+    is_outlier?: boolean;
+    outlier_label?: string;
   }[];
   deposit_months_median: number | null;
   maintenance_median: number | null;

@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import ReactMap, { Marker, NavigationControl } from "react-map-gl/maplibre";
+import { usePostHog } from "posthog-js/react";
+import { EmptyState } from "@/components/EmptyState";
 import type { MapRef } from "react-map-gl/maplibre";
 import type { MapFilters } from "@/models/filters";
 import type { SocietyIntel } from "@/app/api/societies/route";
@@ -122,6 +124,7 @@ export default function PuneMap({
   isPickingLocation = false,
   onSelect,
   onPickLocation,
+  onClearFilters,
   refreshKey = 0,
 }: {
   filters?: MapFilters;
@@ -130,6 +133,7 @@ export default function PuneMap({
   /** Called with the society UUID when a marker is clicked */
   onSelect?: (id: string) => void;
   onPickLocation?: (location: { lat: number; lng: number }) => void;
+  onClearFilters?: () => void;
   refreshKey?: number;
 }) {
   const [societies, setSocieties] = useState<SocietyIntel[]>([]);
@@ -138,6 +142,7 @@ export default function PuneMap({
   const [pickedLocation, setPickedLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [theme, setTheme] = useState<MapTheme>("blue");
   const [zoom, setZoom] = useState(12);
+  const posthog = usePostHog();
 
   function handleStyleReady(map: MapRef["getMap"] extends () => infer T ? T : never) {
     if (theme === "blue") {
@@ -241,11 +246,14 @@ export default function PuneMap({
         setPickedLocation(location);
         onPickLocation?.(location);
       }}
-      onLoad={(event) => handleStyleReady(event.target)}
+      onLoad={(event) => {
+        handleStyleReady(event.target);
+        posthog?.capture("map_loaded");
+      }}
       onMove={(event) => setZoom(event.viewState.zoom)}
       onStyleData={(event) => handleStyleReady(event.target)}
     >
-      <NavigationControl position="top-right" showCompass={false} />
+      <NavigationControl position="bottom-right" showCompass={false} />
       {clusters.map((item) =>
         item.type === "cluster" ? (
           <Marker key={item.id} longitude={item.lng} latitude={item.lat} anchor="bottom">
@@ -277,12 +285,27 @@ export default function PuneMap({
             <button
               type="button"
               className={`pune-rent-marker ${item.society.is_seed ? "pune-rent-marker-admin" : "pune-rent-marker-community"}`}
-              onClick={() => onSelect?.(item.society.id)}
+              onClick={() => {
+                posthog?.capture("society_marker_clicked", { society_id: item.society.id, society_name: item.society.name });
+                onSelect?.(item.society.id);
+              }}
               title={`${item.society.name}, ${item.society.area_slug}`}
             >
               <span className="pune-rent-marker-badge">
                 {item.society.is_seed ? "EST" : "LIVE"}
               </span>
+              
+              {/* Bachelor indicator dot */}
+              <div 
+                className={`w-1.5 h-1.5 rounded-full mr-1.5 inline-block ${
+                  item.society.bachelor_label === "Friendly" ? "bg-green-500" :
+                  item.society.bachelor_label === "Families" ? "bg-red-500" :
+                  item.society.bachelor_label === "Conditional" ? "bg-yellow-500" :
+                  "bg-neutral-500"
+                }`}
+                title={`Bachelor Reality: ${item.society.bachelor_label || "Unknown"}`}
+              />
+
               <span>{item.society.name.split(" ")[0]}</span>
               <span className="pune-rent-marker-dot">·</span>
               <span>{formatRent(item.society.median_rent)}</span>
@@ -297,6 +320,9 @@ export default function PuneMap({
       )}
       {isLoading && <div className="map-state-panel">Loading societies...</div>}
       {loadError && <div className="map-state-panel map-state-panel-error">{loadError}</div>}
+      {!isLoading && !loadError && societies.length === 0 && (
+        <EmptyState onClearFilters={onClearFilters} />
+      )}
       {isPickingLocation && (
         <div className="map-pick-panel">Click the map to choose this rent&apos;s location</div>
       )}

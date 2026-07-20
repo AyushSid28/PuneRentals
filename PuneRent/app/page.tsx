@@ -7,6 +7,7 @@ import { Toolbar } from "@/components/toolbar/Toolbar";
 import { PHASE1_AREAS } from "@/lib/constants";
 import { DEFAULT_FILTERS, type MapFilters } from "@/models/filters";
 import type { IntelligencePayload } from "@/models/pin";
+import { usePostHog } from "posthog-js/react";
 
 type Modal = "stats" | "faq" | "tour" | "pin" | "report" | null;
 
@@ -21,6 +22,7 @@ export default function Home() {
   const [anonymousUserId, setAnonymousUserId] = useState<string>("");
   const [pinPrefill, setPinPrefill] = useState<{ society_name: string; area_slug: string; lat: number; lng: number } | null>(null);
   const [selectedSocietyId, setSelectedSocietyId] = useState<string | null>(null);
+  const posthog = usePostHog();
 
   useEffect(() => {
     let id = localStorage.getItem("pune_rent_anonymous_user_id");
@@ -49,12 +51,21 @@ export default function Home() {
     }
     setIntel(data);
     setSelectedSocietyId(id);
+    posthog?.capture("society_sheet_opened", { society_id: id, society_name: data.society_name });
+  }
+
+  function handleFilterChange(newFilters: MapFilters) {
+    setFilters(newFilters);
+    posthog?.capture("filter_applied", { filters: newFilters });
   }
 
   return (
     <main className="relative h-dvh w-full overflow-hidden bg-neutral-950">
       <Toolbar onOpen={setModal} />
-      <FilterBar filters={filters} onChange={setFilters} onSearchSelect={setSearchedLocation} />
+      <FilterBar filters={filters} onChange={handleFilterChange} onSearchSelect={(loc) => {
+        setSearchedLocation(loc);
+        if (loc) posthog?.capture("search_used", { location: loc.name });
+      }} />
       <div className="absolute inset-0 top-12">
         <PuneMap
           filters={filters}
@@ -65,6 +76,7 @@ export default function Home() {
             setModal("pin");
           }}
           onSelect={selectSociety}
+          onClearFilters={() => setFilters(DEFAULT_FILTERS)}
         />
       </div>
 
@@ -482,6 +494,17 @@ function PinRentModal({
       area_slug: String(form.get("area_slug") ?? ""),
       lat: Number(form.get("lat")),
       lng: Number(form.get("lng")),
+    };
+
+    if (!payload.lat || !payload.lng) {
+      setError("Please right-click on the map to set a location pin first.");
+      setSubmitting(false);
+      return;
+    }
+
+    Object.assign(payload, {
+      lat: Number(form.get("lat")),
+      lng: Number(form.get("lng")),
       bhk: Number(form.get("bhk")),
       rent_inr: Number(form.get("rent_inr")),
       furnishing: form.get("furnishing"),
@@ -495,7 +518,7 @@ function PinRentModal({
       comment: String(form.get("comment") ?? "") || undefined,
       confirm_outlier: confirmOutlier,
       user_id: anonymousUserId,
-    };
+    });
 
     const response = await fetch("/api/pins", {
       method: "POST",
@@ -516,6 +539,9 @@ function PinRentModal({
         setError(err);
       } else if (err?.formErrors?.[0]) {
         setError(err.formErrors[0]);
+      } else if (err?.fieldErrors) {
+        const firstField = Object.keys(err.fieldErrors)[0];
+        setError(`${firstField}: ${err.fieldErrors[firstField][0]}`);
       } else {
         setError("Validation failed. Please check your inputs.");
       }

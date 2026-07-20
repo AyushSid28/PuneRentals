@@ -3,6 +3,7 @@ import { getUserId } from "@/lib/auth";
 import { hasSupabase, supabaseAdmin } from "@/lib/db/client";
 import * as store from "@/lib/db/store";
 import { voteSchema } from "@/lib/validators/pin";
+import { getRedisClient, invalidateCache } from "@/lib/db/redis";
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
@@ -45,6 +46,14 @@ export async function POST(req: NextRequest) {
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
+
+    const areaSlug = parsed.data.society_key.split(":")[1];
+    await invalidateCache([
+      `society:${obs?.society_id}`,
+      `area:${areaSlug}`,
+      "societies:all"
+    ]);
+
     return NextResponse.json({ ok: true });
   }
 

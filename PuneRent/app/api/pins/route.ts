@@ -5,6 +5,7 @@ import * as store from "@/lib/db/store";
 import { getUserId } from "@/lib/auth";
 import { inPune, societyKey } from "@/lib/services/geo";
 import { checkOutlier, checkPlausible } from "@/lib/services/outlier";
+import { getRedisClient, invalidateCache } from "@/lib/db/redis";
 import { createObservationSchema } from "@/lib/validators/pin";
 
 /**
@@ -146,7 +147,15 @@ export async function POST(req: NextRequest) {
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
-    return NextResponse.json({ id: data.id }, { status: 201 });
+
+    // Invalidate cache
+    await invalidateCache([
+      `society:${societyId}`,
+      `area:${input.area_slug}`,
+      "societies:all"
+    ]);
+
+    return NextResponse.json({ success: true, observation: data });
   }
 
   // Local fallback — no society_id needed

@@ -3,6 +3,7 @@ import { hasSupabase, supabaseAdmin } from "@/lib/db/client";
 import { medianOf } from "@/lib/services/aggregation";
 import { seedObservations } from "@/lib/data/pins";
 import type { RentObservation } from "@/models/pin";
+import { getRedisClient } from "@/lib/db/redis";
 
 export async function GET(
   req: NextRequest,
@@ -10,6 +11,18 @@ export async function GET(
 ) {
   try {
     const { slug } = await params;
+    
+    const cacheKey = `area:${slug}`;
+    const client = getRedisClient();
+    
+    if (client) {
+      try {
+        const cached = await client.get(cacheKey);
+        if (cached) return NextResponse.json(cached);
+      } catch (e) {
+        console.warn("[Redis] get error", e);
+      }
+    }
 
     let dbSocieties: any[] = [];
     let dbObs: RentObservation[] = [];
@@ -85,7 +98,7 @@ export async function GET(
     const { computeSocietyBachelorIntel } = await import("@/lib/services/bachelorScore");
     const bachelorIntel = computeSocietyBachelorIntel("area", areaVotes);
 
-    return NextResponse.json({
+    const responseData = {
       area: slug,
       median_rent,
       avg_rent,
@@ -94,7 +107,13 @@ export async function GET(
       bachelor_score: bachelorIntel.bachelor_score,
       confidence: bachelorIntel.confidence,
       rent_by_bhk
-    });
+    };
+
+    if (client) {
+      await client.setex(cacheKey, 900, responseData).catch(e => console.warn("[Redis] setex error", e));
+    }
+
+    return NextResponse.json(responseData);
 
   } catch (e) {
     console.error("[areas] Unexpected error:", e);

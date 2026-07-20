@@ -5,6 +5,7 @@ import { societyKey } from "@/lib/services/geo";
 import { seedObservations } from "@/lib/data/pins";
 import type { IntelligencePayload, RentObservation } from "@/models/pin";
 import type { BachelorAnswer } from "@/models/bachelor";
+import { getRedisClient } from "@/lib/db/redis";
 
 /**
  * GET /api/societies/:id
@@ -17,6 +18,18 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+  
+  const cacheKey = `society:${id}`;
+  const client = getRedisClient();
+
+  if (client) {
+    try {
+      const cached = await client.get(cacheKey);
+      if (cached) return NextResponse.json(cached);
+    } catch (e) {
+      console.warn("[Redis] get error", e);
+    }
+  }
 
   try {
     let observations: RentObservation[];
@@ -77,11 +90,21 @@ export async function GET(
           // Override names from the society row since there are no observations
           payload.society_name = society.name;
           payload.area_slug = society.area_slug;
+          
+          if (client) {
+            await client.setex(cacheKey, 600, payload).catch(e => console.warn("[Redis] setex error", e));
+          }
           return NextResponse.json(payload);
         }
 
         const key2 = observations[0].society_key;
-        return NextResponse.json(buildIntelligence(key2, observations, votes, reviews));
+        const payload = buildIntelligence(key2, observations, votes, reviews);
+        
+        if (client) {
+          await client.setex(cacheKey, 600, payload).catch(e => console.warn("[Redis] setex error", e));
+        }
+        
+        return NextResponse.json(payload);
       }
     }
 
@@ -94,7 +117,13 @@ export async function GET(
       return NextResponse.json({ error: "Society not found" }, { status: 404 });
     }
     const sameKey = allObs.filter((o) => o.society_key === matched.society_key);
-    return NextResponse.json(buildIntelligence(matched.society_key, sameKey, [], []));
+    const payload = buildIntelligence(matched.society_key, sameKey, [], []);
+    
+    if (client) {
+      await client.setex(cacheKey, 600, payload).catch(e => console.warn("[Redis] setex error", e));
+    }
+    
+    return NextResponse.json(payload);
   } catch (e) {
     console.error("[societies/[id]] unexpected error:", e);
     return NextResponse.json({ error: "Unexpected server error" }, { status: 500 });

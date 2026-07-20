@@ -37,6 +37,8 @@ export interface SocietiesResponse {
  * Optional query param:
  *   ?q=searchterm
  */
+import { getRedisClient } from "@/lib/db/redis";
+
 export async function GET(req: NextRequest) {
   try {
     const url = new URL(req.url);
@@ -47,6 +49,21 @@ export async function GET(req: NextRequest) {
     const rentMin = url.searchParams.get("rentMin") ? Number(url.searchParams.get("rentMin")) : null;
     const rentMax = url.searchParams.get("rentMax") ? Number(url.searchParams.get("rentMax")) : null;
     const bachelorOnly = url.searchParams.get("bachelorOnly") === "true";
+
+    const hasFilters = !!(search || areaSlug || bhkFilter || furnishingFilter || rentMin || rentMax || bachelorOnly);
+    const cacheKey = "societies:all";
+
+    if (!hasFilters) {
+      const client = getRedisClient();
+      if (client) {
+        try {
+          const cached = await client.get(cacheKey);
+          if (cached) return NextResponse.json({ societies: cached });
+        } catch (e) {
+          console.warn("[Redis] get error", e);
+        }
+      }
+    }
 
     let dbSocieties: any[] = [];
     let dbObs: RentObservation[] = [];
@@ -172,6 +189,13 @@ export async function GET(req: NextRequest) {
     }
 
     finalSocieties.sort((a, b) => a.name.localeCompare(b.name));
+
+    if (!hasFilters) {
+      const client = getRedisClient();
+      if (client) {
+        await client.setex(cacheKey, 600, finalSocieties).catch(e => console.warn("[Redis] setex error", e));
+      }
+    }
 
     return NextResponse.json({ societies: finalSocieties });
   } catch (e) {

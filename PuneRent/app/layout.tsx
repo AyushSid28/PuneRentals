@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "maplibre-gl/dist/maplibre-gl.css";
 import "./globals.css";
+import { PostHogProvider } from "@/lib/analytics/PostHogProvider";
 
 export const metadata: Metadata = {
   title: "Pune.rent — Rental intelligence map",
@@ -15,7 +16,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="min-h-dvh antialiased">{children}</body>
+      <body className="min-h-dvh antialiased">
+        <PostHogProvider>
+          {children}
+        </PostHogProvider>
+      </body>
     </html>
   );
 }

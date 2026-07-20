@@ -39,26 +39,12 @@ create trigger trg_update_society_timestamp
 before update on public.societies
 for each row execute function public.update_society_timestamp();
 
--- Add foreign key to observations
-alter table public.rent_observations add column if not exists society_id uuid references public.societies(id);
+-- Schema tables creation continues below
 
--- Add foreign key to votes
-alter table public.bachelor_votes add column if not exists society_id uuid references public.societies(id);
-
--- Index for society_id on votes
-create index if not exists idx_votes_society_id on public.bachelor_votes(society_id);
-
--- Add foreign key to reviews
-alter table public.reviews add column if not exists society_id uuid references public.societies(id);
-
--- Index for society_id on reviews
-create index if not exists idx_reviews_society_id on public.reviews(society_id);
-
--- Add foreign key to reports (reference to observation already has observation_id, but add society reference for convenience)
-alter table public.reports add column if not exists society_id uuid references public.societies(id);
-
+create table if not exists public.rent_observations (
   id uuid primary key default gen_random_uuid(),
   user_id uuid,
+  society_id uuid references public.societies(id),
   lat double precision not null,
   lng double precision not null,
   bhk smallint not null check (bhk between 1 and 5),
@@ -94,14 +80,6 @@ create table if not exists public.bachelor_votes (
   created_at timestamptz not null default now(),
   unique (society_key, user_id)
 );
-  id uuid primary key default gen_random_uuid(),
-  society_key text not null,
-  user_id uuid not null,
-  bachelors_allowed text not null check (bachelors_allowed in ('yes', 'no', 'depends')),
-  visitors_restricted text check (visitors_restricted in ('yes', 'no', 'depends')),
-  created_at timestamptz not null default now(),
-  unique (society_key, user_id)
-);
 
 create table if not exists public.reviews (
   id uuid primary key default gen_random_uuid(),
@@ -112,24 +90,11 @@ create table if not exists public.reviews (
   owner_strictness smallint check (owner_strictness between 1 and 5),
   created_at timestamptz not null default now()
 );
-  id uuid primary key default gen_random_uuid(),
-  society_key text not null,
-  user_id uuid not null,
-  body text not null check (char_length(body) <= 500),
-  owner_strictness smallint check (owner_strictness between 1 and 5),
-  created_at timestamptz not null default now()
-);
 
 create table if not exists public.reports (
   id uuid primary key default gen_random_uuid(),
   observation_id uuid not null references public.rent_observations(id) on delete cascade,
   society_id uuid references public.societies(id),
-  user_id uuid,
-  reason text not null,
-  created_at timestamptz not null default now()
-);
-  id uuid primary key default gen_random_uuid(),
-  observation_id uuid not null references public.rent_observations(id) on delete cascade,
   user_id uuid,
   reason text not null,
   created_at timestamptz not null default now()
@@ -149,3 +114,21 @@ create policy "public read votes"
 
 create policy "public read reviews"
   on public.reviews for select using (true);
+
+-- Add foreign key to observations
+alter table public.rent_observations add column if not exists society_id uuid references public.societies(id);
+
+-- Add foreign key to votes
+alter table public.bachelor_votes add column if not exists society_id uuid references public.societies(id);
+
+-- Index for society_id on votes
+create index if not exists idx_votes_society_id on public.bachelor_votes(society_id);
+
+-- Add foreign key to reviews
+alter table public.reviews add column if not exists society_id uuid references public.societies(id);
+
+-- Index for society_id on reviews
+create index if not exists idx_reviews_society_id on public.reviews(society_id);
+
+-- Add foreign key to reports (reference to observation already has observation_id, but add society reference for convenience)
+alter table public.reports add column if not exists society_id uuid references public.societies(id);

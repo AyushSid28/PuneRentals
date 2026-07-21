@@ -557,11 +557,11 @@ function SimpleModal({
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4" onClick={onClose}>
-      <section className="w-full max-w-md rounded-xl bg-white p-4 text-sm text-neutral-700 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <h2 className="text-base font-semibold text-neutral-950">{title}</h2>
-          <button type="button" onClick={onClose} className="text-neutral-500">
-            Close
+      <section className="w-full max-w-sm rounded-2xl border border-white/10 bg-neutral-950 p-5 text-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="mb-5 flex items-center justify-between">
+          <h2 className="text-lg font-bold">{title}</h2>
+          <button type="button" onClick={onClose} className="flex h-7 w-7 items-center justify-center rounded-full bg-white/10 text-white/60 hover:bg-white/20 text-sm">
+            ✕
           </button>
         </div>
         {children}
@@ -588,16 +588,16 @@ function StatsOverlay({ onClose }: { onClose: () => void }) {
         {areas.map((area) => (
           <li
             key={area.slug}
-            className="flex justify-between gap-3 border-b border-neutral-100 py-1"
+            className="flex justify-between gap-3 border-b border-white/10 py-1"
           >
             <span className="capitalize">{area.slug.replace("-", " ")}</span>
-            <span className="text-neutral-600">
+            <span className="text-white/60">
               2BHK median Rs {area.by_bhk["2"]?.median ?? "-"} (n=
               {area.by_bhk["2"]?.n ?? 0})
             </span>
           </li>
         ))}
-        {!areas.length && <li className="text-neutral-500">Loading...</li>}
+        {!areas.length && <li className="text-white/50">Loading...</li>}
       </ul>
     </SimpleModal>
   );
@@ -693,7 +693,7 @@ function PinRentModal({
       <form className="space-y-3" onSubmit={submit}>
         {prefill ? (
           <>
-            <div className="rounded-lg bg-neutral-100 p-3 text-sm text-neutral-600">
+            <div className="rounded-lg border border-white/10 bg-white/5 p-3 text-sm text-white/70">
               Pinning rent at <strong>{prefill.society_name}</strong>
             </div>
             <input type="hidden" name="society_name" value={prefill.society_name} />
@@ -703,8 +703,8 @@ function PinRentModal({
           </>
         ) : (
           <>
-            <input name="society_name" required placeholder="Society name" className="w-full rounded-lg border px-3 py-2" />
-            <select name="area_slug" required className="w-full rounded-lg border px-3 py-2">
+            <input name="society_name" required placeholder="Society name" className="w-full rounded-lg border border-white/10 bg-white/10 px-3 py-2 text-sm placeholder:text-white/40" />
+            <select name="area_slug" required className="w-full rounded-lg border border-white/10 bg-white/10 px-3 py-2 text-sm text-white [&>option]:text-black">
               <option value="">Area</option>
               {PHASE1_AREAS.map((area) => (
                 <option key={area.slug} value={area.slug}>{area.name}</option>
@@ -715,27 +715,27 @@ function PinRentModal({
           </>
         )}
         <div className="grid grid-cols-2 gap-2">
-          <select name="bhk" required className="rounded-lg border px-3 py-2">
+          <select name="bhk" required className="rounded-lg border border-white/10 bg-white/10 px-3 py-2 text-sm text-white [&>option]:text-black">
             {[1, 2, 3, 4, 5].map((bhk) => <option key={bhk} value={bhk}>{bhk} BHK</option>)}
           </select>
-          <input name="rent_inr" required type="number" min="1" placeholder="Rent / month" className="rounded-lg border px-3 py-2" />
+          <input name="rent_inr" required type="number" min="1" placeholder="Rent / month" className="rounded-lg border border-white/10 bg-white/10 px-3 py-2 text-sm placeholder:text-white/40" />
         </div>
-        <select name="furnishing" required className="w-full rounded-lg border px-3 py-2">
+        <select name="furnishing" required className="w-full rounded-lg border border-white/10 bg-white/10 px-3 py-2 text-sm text-white [&>option]:text-black">
           <option value="semi">Semi furnished</option>
           <option value="fully">Fully furnished</option>
           <option value="unfurnished">Unfurnished</option>
         </select>
         <div className="grid grid-cols-2 gap-2">
-          <input name="deposit_months" type="number" step="0.5" placeholder="Deposit months" className="rounded-lg border px-3 py-2" />
-          <input name="maintenance_inr" type="number" placeholder="Maintenance" className="rounded-lg border px-3 py-2" />
+          <input name="deposit_months" type="number" step="0.5" placeholder="Deposit months" className="rounded-lg border border-white/10 bg-white/10 px-3 py-2 text-sm placeholder:text-white/40" />
+          <input name="maintenance_inr" type="number" placeholder="Maintenance" className="rounded-lg border border-white/10 bg-white/10 px-3 py-2 text-sm placeholder:text-white/40" />
         </div>
-        <label className="flex items-center gap-2">
-          <input name="is_gated" type="checkbox" />
+        <label className="flex items-center gap-2 text-sm text-white/80">
+          <input name="is_gated" type="checkbox" className="rounded border-white/10 bg-white/10" />
           <span>Gated society</span>
         </label>
-        <textarea name="comment" maxLength={500} placeholder="Optional tenant note" className="min-h-20 w-full rounded-lg border px-3 py-2" />
-        {error && <p className="rounded-lg bg-amber-50 p-2 text-amber-900">{error}</p>}
-        <button disabled={submitting} className="w-full rounded-lg bg-neutral-950 px-3 py-2 font-semibold text-white disabled:opacity-60">
+        <textarea name="comment" maxLength={500} placeholder="Optional tenant note" className="min-h-20 w-full rounded-lg border border-white/10 bg-white/10 px-3 py-2 text-sm placeholder:text-white/40" />
+        {error && <p className="rounded-lg border border-amber-900/50 bg-amber-900/30 p-2 text-sm text-amber-200">{error}</p>}
+        <button disabled={submitting} className="w-full rounded-lg bg-blue-600 px-3 py-2.5 text-sm font-semibold text-white shadow-lg transition-colors hover:bg-blue-700 disabled:opacity-60">
           {submitting ? "Submitting..." : confirmOutlier ? "Confirm and pin rent" : "Pin rent"}
         </button>
       </form>
@@ -788,11 +788,11 @@ function ReportModal({
           required
           minLength={3}
           maxLength={300}
-          className="min-h-28 w-full rounded-lg border px-3 py-2"
+          className="min-h-28 w-full rounded-lg border border-white/10 bg-white/10 px-3 py-2 text-sm placeholder:text-white/40"
           placeholder="What looks wrong? Example: rent is outdated, wrong society, duplicate pin..."
         />
-        {error && <p className="rounded-lg bg-red-50 p-2 text-red-700">{error}</p>}
-        <button disabled={submitting} className="w-full rounded-lg bg-neutral-950 px-3 py-2 font-semibold text-white disabled:opacity-60">
+        {error && <p className="rounded-lg border border-red-900/50 bg-red-900/30 p-2 text-sm text-red-200">{error}</p>}
+        <button disabled={submitting} className="w-full rounded-lg bg-red-600 px-3 py-2.5 text-sm font-semibold text-white shadow-lg transition-colors hover:bg-red-700 disabled:opacity-60">
           {submitting ? "Reporting..." : "Submit report"}
         </button>
       </form>

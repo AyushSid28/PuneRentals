@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { hasSupabase, supabaseAdmin } from "@/lib/db/client";
 import * as store from "@/lib/db/store";

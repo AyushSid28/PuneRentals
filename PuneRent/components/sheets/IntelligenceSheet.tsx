@@ -21,8 +21,8 @@ export function IntelligenceSheet({
   const selectedFlat = selectedFlatId ? data.observations?.find(f => f.id === selectedFlatId) : null;
 
   return (
-    <div className="fixed inset-0 z-50 pointer-events-none flex items-center justify-center p-4">
-      <div className="pointer-events-auto max-h-[90vh] w-full max-w-[420px] overflow-y-auto rounded-2xl bg-neutral-900 text-neutral-100 p-4 shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="pointer-events-auto max-h-[90vh] w-full max-w-[420px] overflow-y-auto rounded-2xl bg-neutral-900 text-neutral-100 p-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
         {!selectedFlat ? (
           <>
             <div className="mb-4 flex items-start justify-between">
@@ -49,7 +49,7 @@ export function IntelligenceSheet({
                     <span className="text-neutral-400 font-normal">· {flat.bhk}BHK</span>
                     {flat.is_outlier && (
                       <span className="text-xs font-medium text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
-                        ⚠️ {flat.outlier_label || "Unusual price"}
+                        ⚠️ {flat.outlier_label || "Verify Price"}
                       </span>
                     )}
                   </div>
@@ -73,7 +73,7 @@ export function IntelligenceSheet({
                   <span>₹{selectedFlat.rent_inr.toLocaleString()}</span>
                   {selectedFlat.is_outlier && (
                     <span className="text-sm font-medium text-amber-500 bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20 mt-1">
-                      ⚠️ {selectedFlat.outlier_label || "Unusual price"}
+                      ⚠️ {selectedFlat.outlier_label || "Verify Price"}
                     </span>
                   )}
                 </h2>

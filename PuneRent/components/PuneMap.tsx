@@ -246,6 +246,18 @@ export default function PuneMap({
         setPickedLocation(location);
         onPickLocation?.(location);
       }}
+      onClick={(event) => {
+        // Only handle touch taps (mobile) — desktop uses right-click above
+        const orig = event.originalEvent as PointerEvent;
+        if (orig.pointerType !== "touch") return;
+        if (event.defaultPrevented) return; // marker click already handled
+        const location = {
+          lat: Number(event.lngLat.lat.toFixed(6)),
+          lng: Number(event.lngLat.lng.toFixed(6)),
+        };
+        setPickedLocation(location);
+        onPickLocation?.(location);
+      }}
       onLoad={(event) => {
         handleStyleReady(event.target);
         posthog?.capture("map_loaded");

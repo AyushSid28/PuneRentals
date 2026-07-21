@@ -248,6 +248,30 @@ function FilterBar({
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
+
+  // Draft state — holds uncommitted filter selections inside the modal
+  const [draft, setDraft] = useState<MapFilters>({ ...filters });
+
+  const hasActiveFilters =
+    filters.bhk != null ||
+    filters.areaSlug != null ||
+    filters.rentMin != null ||
+    filters.rentMax != null ||
+    filters.furnishing != null ||
+    filters.source != null ||
+    filters.bachelorOnly === true ||
+    filters.gatedOnly === true;
+
+  function openFilters() {
+    setDraft({ ...filters }); // Initialize draft from current active filters
+    setShowFilters(true);
+  }
+
+  function applyAndClose() {
+    onChange({ ...draft, bachelorOnly: filters.bachelorOnly }); // Commit draft, keep live bachelorOnly
+    setShowFilters(false);
+  }
 
   useEffect(() => {
     if (query.length < 2) {
@@ -265,147 +289,260 @@ function FilterBar({
       } finally {
         setIsSearching(false);
       }
-    }, 400); // Wait 400ms after user stops typing
+    }, 400);
     return () => clearTimeout(timer);
   }, [query]);
 
   return (
-    <div className="absolute left-3 right-3 top-14 z-30 flex flex-wrap items-center gap-2 rounded-xl border border-white/10 bg-neutral-950/80 p-2 text-xs text-white shadow-2xl backdrop-blur sm:left-auto">
-      <div className="relative min-w-52 flex-1 sm:flex-none">
-        <input
-          value={query}
-          onChange={(event) => {
-            setQuery(event.target.value);
-            if (event.target.value === "") {
-              onSearchSelect(null);
-            }
-          }}
-          placeholder="Search society or landmark..."
-          className="w-full rounded-lg border border-white/10 bg-white/10 px-3 py-2 placeholder:text-white/55"
-        />
+    <>
+      {/* ── Compact search bar + filter button ─────────────────────────── */}
+      <div className="absolute left-1/2 top-14 z-30 flex w-[calc(100%-24px)] max-w-lg -translate-x-1/2 items-center gap-2 rounded-xl border border-white/10 bg-neutral-950/80 p-2 text-xs text-white shadow-2xl backdrop-blur">
+        <div className="relative flex-1">
+          <input
+            value={query}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              if (event.target.value === "") {
+                onSearchSelect(null);
+              }
+            }}
+            placeholder="Search neighbourhood or area..."
+            className="w-full rounded-lg border border-white/10 bg-white/10 px-3 py-2 placeholder:text-white/55"
+          />
 
-        {/* Dropdown Menu */}
-        {results.length > 0 && (
-          <ul className="absolute left-0 right-0 top-full mt-1 max-h-60 overflow-y-auto rounded-lg border border-white/10 bg-neutral-950 shadow-2xl">
-            {results.map((r) => (
-              <li key={`${r.type}-${r.id}`}>
-                <button
-                  type="button"
-                  className="w-full px-3 py-2 text-left hover:bg-white/10"
-                  onClick={() => {
-                    onSearchSelect({ lat: r.lat, lng: r.lng, name: r.name });
-                    setQuery(r.name);
-                    setResults([]);
-                    onChange({ ...filters, query: "" });
-                  }}
-                >
-                  <div className="font-semibold">{r.name}</div>
-                  <div className="text-[10px] text-white/50">{r.subtitle}</div>
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
+          {results.length > 0 && (
+            <ul className="absolute left-0 right-0 top-full mt-1 max-h-60 overflow-y-auto rounded-lg border border-white/10 bg-neutral-950 shadow-2xl">
+              {results.map((r) => (
+                <li key={`${r.type}-${r.id}`}>
+                  <button
+                    type="button"
+                    className="w-full px-3 py-2 text-left hover:bg-white/10"
+                    onClick={() => {
+                      onSearchSelect({ lat: r.lat, lng: r.lng, name: r.name });
+                      setQuery(r.name);
+                      setResults([]);
+                      onChange({ ...filters, query: "" });
+                    }}
+                  >
+                    <div className="font-semibold">{r.name}</div>
+                    <div className="text-[10px] text-white/50">{r.subtitle}</div>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <button
+          type="button"
+          onClick={openFilters}
+          className="relative flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/10 px-3 py-2 font-semibold hover:bg-white/20 transition-colors"
+        >
+          <span>☰</span> Filter
+          {hasActiveFilters && (
+            <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-blue-500 ring-2 ring-neutral-950" />
+          )}
+        </button>
       </div>
 
-      <select
-        value={filters.areaSlug ?? ""}
-        onChange={(event) =>
-          onChange({ ...filters, areaSlug: event.target.value || null })
-        }
-        className="rounded-lg border border-white/10 bg-white/10 px-2 py-2"
-      >
-        <option value="">All areas</option>
-        {PHASE1_AREAS.map((area) => (
-          <option key={area.slug} value={area.slug}>
-            {area.name}
-          </option>
-        ))}
-      </select>
-      {[1, 2, 3].map((bhk) => (
-        <button
-          key={bhk}
-          type="button"
-          className={`rounded-lg px-3 py-2 font-semibold ${filters.bhk === bhk ? "bg-white text-neutral-950" : "bg-white/10"
-            }`}
-          onClick={() =>
-            onChange({ ...filters, bhk: filters.bhk === bhk ? null : bhk })
-          }
-        >
-          {bhk}BHK
-        </button>
-      ))}
-      <select
-        value={filters.source ?? ""}
-        onChange={(event) =>
-          onChange({
-            ...filters,
-            source: (event.target.value || null) as MapFilters["source"],
-          })
-        }
-        className="rounded-lg border border-white/10 bg-white/10 px-2 py-2"
-      >
-        <option value="">All sources</option>
-        <option value="admin">Estimated</option>
-        <option value="community">Community</option>
-      </select>
-      <input
-        value={filters.rentMin ?? ""}
-        onChange={(event) =>
-          onChange({
-            ...filters,
-            rentMin: event.target.value ? Number(event.target.value) : null,
-          })
-        }
-        type="number"
-        placeholder="Min rent"
-        className="w-24 rounded-lg border border-white/10 bg-white/10 px-2 py-2 placeholder:text-white/55"
-      />
-      <input
-        value={filters.rentMax ?? ""}
-        onChange={(event) =>
-          onChange({
-            ...filters,
-            rentMax: event.target.value ? Number(event.target.value) : null,
-          })
-        }
-        type="number"
-        placeholder="Max rent"
-        className="w-24 rounded-lg border border-white/10 bg-white/10 px-2 py-2 placeholder:text-white/55"
-      />
-      <select
-        value={filters.furnishing ?? ""}
-        onChange={(event) =>
-          onChange({
-            ...filters,
-            furnishing: (event.target.value || null) as MapFilters["furnishing"],
-          })
-        }
-        className="rounded-lg border border-white/10 bg-white/10 px-2 py-2"
-      >
-        <option value="">All furnishing</option>
-        <option value="unfurnished">Unfurnished</option>
-        <option value="semi">Semi</option>
-        <option value="fully">Fully</option>
-      </select>
-      <button
-        type="button"
-        className={`rounded-lg px-3 py-2 font-semibold ${filters.bachelorOnly ? "bg-white text-neutral-950" : "bg-white/10"
-          }`}
-        onClick={() =>
-          onChange({ ...filters, bachelorOnly: !filters.bachelorOnly })
-        }
-      >
-        Bachelor Friendly Only
-      </button>
-      <button
-        type="button"
-        className="rounded-lg bg-white/10 px-3 py-2 font-semibold"
-        onClick={() => onChange(DEFAULT_FILTERS)}
-      >
-        Reset
-      </button>
-    </div>
+      {/* ── Filter modal ───────────────────────────────────────────────── */}
+      {showFilters && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 sm:items-center sm:pt-0" onClick={() => setShowFilters(false)}>
+          <div
+            className="w-full max-w-sm rounded-2xl border border-white/10 bg-neutral-950 p-5 text-white shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="mb-5 flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-bold">Filters</h2>
+                <p className="text-xs text-white/50">Customize the way you see pune.rent</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  className="text-xs font-semibold text-blue-400 hover:text-blue-300"
+                  onClick={() => {
+                    setDraft({ ...DEFAULT_FILTERS, bachelorOnly: filters.bachelorOnly });
+                    onChange({ ...DEFAULT_FILTERS, bachelorOnly: filters.bachelorOnly });
+                  }}
+                >
+                  Clear all
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowFilters(false)}
+                  className="flex h-7 w-7 items-center justify-center rounded-full bg-white/10 text-white/60 hover:bg-white/20 text-sm"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+
+            {/* BHK — updates draft */}
+            <div className="mb-5">
+              <h3 className="mb-2 text-xs font-semibold tracking-wider text-white/50">BEDROOMS (BHK)</h3>
+              <div className="flex gap-2">
+                {[1, 2, 3, 4, 5].map((bhk) => (
+                  <button
+                    key={bhk}
+                    type="button"
+                    className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
+                      draft.bhk === bhk
+                        ? "bg-white text-neutral-950"
+                        : "bg-white/10 hover:bg-white/20"
+                    }`}
+                    onClick={() =>
+                      setDraft({ ...draft, bhk: draft.bhk === bhk ? null : bhk })
+                    }
+                  >
+                    {bhk}{bhk === 5 ? "+" : ""}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Rent range — updates draft */}
+            <div className="mb-5">
+              <h3 className="mb-2 text-xs font-semibold tracking-wider text-white/50">RENT RANGE (₹/MONTH)</h3>
+              <div className="flex items-center gap-2">
+                <input
+                  value={draft.rentMin ?? ""}
+                  onChange={(event) =>
+                    setDraft({
+                      ...draft,
+                      rentMin: event.target.value ? Number(event.target.value) : null,
+                    })
+                  }
+                  type="number"
+                  placeholder="Min"
+                  className="w-full min-w-0 flex-1 rounded-lg border border-white/10 bg-white/10 px-3 py-2 text-sm placeholder:text-white/40"
+                />
+                <span className="text-white/30">to</span>
+                <input
+                  value={draft.rentMax ?? ""}
+                  onChange={(event) =>
+                    setDraft({
+                      ...draft,
+                      rentMax: event.target.value ? Number(event.target.value) : null,
+                    })
+                  }
+                  type="number"
+                  placeholder="Max"
+                  className="w-full min-w-0 flex-1 rounded-lg border border-white/10 bg-white/10 px-3 py-2 text-sm placeholder:text-white/40"
+                />
+              </div>
+            </div>
+
+            {/* Neighbourhood — updates draft */}
+            <div className="mb-5">
+              <h3 className="mb-2 text-xs font-semibold tracking-wider text-white/50">NEIGHBOURHOOD</h3>
+              <select
+                value={draft.areaSlug ?? ""}
+                onChange={(event) =>
+                  setDraft({ ...draft, areaSlug: event.target.value || null })
+                }
+                className="w-full rounded-lg border border-white/10 bg-white/10 px-3 py-2.5 text-sm"
+              >
+                <option value="">All Pune</option>
+                {PHASE1_AREAS.map((area) => (
+                  <option key={area.slug} value={area.slug}>
+                    {area.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Furnishing — updates draft */}
+            <div className="mb-5">
+              <h3 className="mb-2 text-xs font-semibold tracking-wider text-white/50">FURNISHING</h3>
+              <div className="flex gap-2">
+                {([
+                  { value: "unfurnished", label: "Unfurnished" },
+                  { value: "semi", label: "Semi" },
+                  { value: "fully", label: "Furnished" },
+                ] as const).map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
+                      draft.furnishing === opt.value
+                        ? "bg-white text-neutral-950"
+                        : "bg-white/10 hover:bg-white/20"
+                    }`}
+                    onClick={() =>
+                      setDraft({
+                        ...draft,
+                        furnishing: draft.furnishing === opt.value ? null : opt.value,
+                      })
+                    }
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Source — updates draft */}
+            <div className="mb-5">
+              <h3 className="mb-2 text-xs font-semibold tracking-wider text-white/50">SOURCE</h3>
+              <div className="flex gap-2">
+                {([
+                  { value: "admin", label: "Estimated" },
+                  { value: "community", label: "Community" },
+                ] as const).map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
+                      draft.source === opt.value
+                        ? "bg-white text-neutral-950"
+                        : "bg-white/10 hover:bg-white/20"
+                    }`}
+                    onClick={() =>
+                      setDraft({
+                        ...draft,
+                        source: draft.source === opt.value ? null : (opt.value as MapFilters["source"]),
+                      })
+                    }
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Bachelor Friendly — applies LIVE */}
+            <div className="mb-4">
+              <button
+                type="button"
+                className={`w-full rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors ${
+                  filters.bachelorOnly
+                    ? "bg-white text-neutral-950"
+                    : "bg-white/10 hover:bg-white/20"
+                }`}
+                onClick={() =>
+                  onChange({ ...filters, bachelorOnly: !filters.bachelorOnly })
+                }
+              >
+                🎓 Bachelor Friendly Only
+              </button>
+            </div>
+
+            {/* Done Button — commits draft to real filters */}
+            <div>
+              <button
+                type="button"
+                onClick={applyAndClose}
+                className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg hover:bg-blue-700 transition-colors"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -419,8 +556,8 @@ function SimpleModal({
   children: React.ReactNode;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
-      <section className="w-full max-w-md rounded-xl bg-white p-4 text-sm text-neutral-700 shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4" onClick={onClose}>
+      <section className="w-full max-w-md rounded-xl bg-white p-4 text-sm text-neutral-700 shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="mb-3 flex items-center justify-between gap-3">
           <h2 className="text-base font-semibold text-neutral-950">{title}</h2>
           <button type="button" onClick={onClose} className="text-neutral-500">

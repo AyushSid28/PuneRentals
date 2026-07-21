@@ -10,13 +10,6 @@ export function Toolbar({
       <span className="mr-2 text-sm font-semibold tracking-tight">Pune.rent</span>
       <button
         type="button"
-        onClick={() => onOpen("pin")}
-        className="rounded-md px-3 py-1 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 shadow-sm transition-colors"
-      >
-        + Pin my rent
-      </button>
-      <button
-        type="button"
         onClick={() => onOpen("tour")}
         className="rounded-md px-2 py-1 text-xs text-neutral-700 hover:bg-neutral-100"
       >

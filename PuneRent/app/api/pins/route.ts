@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { hasSupabase, supabaseAdmin } from "@/lib/db/client";
 import { listMapPins } from "@/lib/data/pins";

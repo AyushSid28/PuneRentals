@@ -8,6 +8,8 @@ import { inPune, societyKey } from "@/lib/services/geo";
 import { checkOutlier, checkPlausible } from "@/lib/services/outlier";
 import { getRedisClient, invalidateCache } from "@/lib/db/redis";
 import { createObservationSchema } from "@/lib/validators/pin";
+import { logger } from "@/lib/logger";
+import { handleSupabaseError } from "@/lib/apiError";
 
 /**
  * Find or create a society row in the `societies` table.
@@ -41,6 +43,7 @@ async function findOrCreateSociety(
       area_slug: areaSlug,
       lat,
       lng,
+      normalized_name: normalizedName,
       source: "community",
       status: "active",
     })
@@ -58,9 +61,9 @@ export async function GET() {
       source: hasSupabase() ? "supabase+local-seed" : "local-seed",
     });
   } catch (error) {
-    console.warn("[pins] Could not load merged pins:", error);
+    logger.error("[pins] Could not load merged pins", { error });
     return NextResponse.json(
-      { error: "Could not load pins" },
+      { error: "Unable to load pins. Please try again later." },
       { status: 500 }
     );
   }
@@ -136,7 +139,7 @@ export async function POST(req: NextRequest) {
         is_gated: input.is_gated ?? null,
         deposit_months: input.deposit_months ?? null,
         maintenance_inr: input.maintenance_inr ?? null,
-        source: "community",
+        // source column removed for compatibility
         confidence: "medium",
         status: outlier.flagged ? "flagged" : "active",
         outlier_reason: outlier.reason,
@@ -146,7 +149,9 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      const apiErr = handleSupabaseError(error);
+      logger.error("[pins] Supabase insert error", { error });
+      return NextResponse.json({ error: apiErr.friendlyMessage }, { status: apiErr.status });
     }
 
     // Invalidate cache

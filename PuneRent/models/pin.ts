@@ -35,7 +35,7 @@ export type MapPin = {
   society_key: string;
   bhk: number;
   rent_inr: number;
-  source: Source;
+  source?: Source;
   status: ObsStatus;
 };
 

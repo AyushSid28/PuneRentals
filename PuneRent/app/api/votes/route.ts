@@ -44,7 +44,9 @@ export async function POST(req: NextRequest) {
       { onConflict: "society_key,user_id" }
     );
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      const apiErr = handleSupabaseError(error);
+      logger.error('[votes] Supabase error', { error });
+      return NextResponse.json({ error: apiErr.friendlyMessage }, { status: apiErr.status });
     }
 
     const areaSlug = parsed.data.society_key.split(":")[1];

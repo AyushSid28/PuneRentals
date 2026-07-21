@@ -4,6 +4,7 @@ import { hasSupabase, supabaseAdmin } from "@/lib/db/client";
 import * as store from "@/lib/db/store";
 import { reportSchema } from "@/lib/validators/pin";
 import { getRedisClient, invalidateCache } from "@/lib/db/redis";
+import { handleSupabaseError } from "@/lib/apiError";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -38,7 +39,9 @@ export async function POST(req: NextRequest) {
       reason: parsed.data.reason,
     });
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      const apiErr = handleSupabaseError(error);
+      logger.error('[reports] Supabase error', { error });
+      return NextResponse.json({ error: apiErr.friendlyMessage }, { status: apiErr.status });
     }
 
     const { count } = await db

@@ -1,5 +1,7 @@
 // app/api/societies/route.ts
 import { NextRequest, NextResponse } from "next/server";
+import { logger } from "@/lib/logger";
+import { handleSupabaseError } from "@/lib/apiError";
 import { hasSupabase, supabaseAdmin } from "@/lib/db/client";
 
 import { seedObservations } from "@/lib/data/pins";
@@ -50,6 +52,8 @@ export async function GET(req: NextRequest) {
     const rentMax = url.searchParams.get("rentMax") ? Number(url.searchParams.get("rentMax")) : null;
     const bachelorOnly = url.searchParams.get("bachelorOnly") === "true";
 
+
+
     const hasFilters = !!(search || areaSlug || bhkFilter || furnishingFilter || rentMin || rentMax || bachelorOnly);
     const cacheKey = "societies:all";
 
@@ -60,7 +64,7 @@ export async function GET(req: NextRequest) {
           const cached = await client.get(cacheKey);
           if (cached) return NextResponse.json({ societies: cached });
         } catch (e) {
-          console.warn("[Redis] get error", e);
+          logger.error("[Redis] get error", { error: e });
         }
       }
     }
@@ -71,16 +75,22 @@ export async function GET(req: NextRequest) {
 
     if (hasSupabase()) {
       const db = supabaseAdmin();
-      
-      const [socRes, obsRes, voteRes] = await Promise.all([
-        db.from("societies").select("id, name, lat, lng, area_slug"),
-        db.from("rent_observations").select("*").in("status", ["active", "flagged"]),
-        db.from("bachelor_votes").select("society_key, bachelors_allowed")
-      ]);
+      try {
+        const [socRes, obsRes, voteRes] = await Promise.all([
+          db.from("societies").select("id, name, lat, lng, area_slug"),
+          db.from("rent_observations").select("*").in("status", ["active", "flagged"]),
+          db.from("bachelor_votes").select("society_key, bachelors_allowed")
+        ]);
 
-      if (socRes.data) dbSocieties = socRes.data;
-      if (obsRes.data) dbObs = obsRes.data as RentObservation[];
-      if (voteRes.data) dbVotes = voteRes.data;
+        if (socRes?.data) dbSocieties = socRes.data;
+        if (obsRes?.data) dbObs = obsRes.data as RentObservation[];
+        if (voteRes?.data) dbVotes = voteRes.data;
+      } catch (supabaseErr) {
+        const apiErr = handleSupabaseError(supabaseErr);
+        logger.error("[societies] Supabase query error", { error: supabaseErr });
+        // Return friendly error response
+        return NextResponse.json({ error: apiErr.friendlyMessage }, { status: apiErr.status });
+      }
     }
 
     // Prepare seeds
@@ -193,13 +203,13 @@ export async function GET(req: NextRequest) {
     if (!hasFilters) {
       const client = getRedisClient();
       if (client) {
-        await client.setex(cacheKey, 600, finalSocieties).catch(e => console.warn("[Redis] setex error", e));
+        await client.setex(cacheKey, 600, finalSocieties).catch(e => logger.error("[Redis] setex error", { error: e }));
       }
     }
 
     return NextResponse.json({ societies: finalSocieties });
   } catch (e) {
-    console.error("[societies] Unexpected error:", e);
-    return NextResponse.json({ error: "Unexpected server error" }, { status: 500 });
+    logger.error("[societies] Unexpected error", { error: e });
+    return NextResponse.json({ error: "Unable to process request. Please try again later." }, { status: 500 });
   }
 }

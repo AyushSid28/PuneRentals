@@ -6,6 +6,7 @@ import {
   usable,
 } from "@/lib/services/aggregation";
 import { computeBachelorRealityScore } from "@/lib/services/bachelorScore";
+import { computeIqrBounds, type IqrBounds } from "@/lib/services/outlier";
 import type { IntelligencePayload, RentObservation } from "@/models/pin";
 
 export function buildIntelligence(
@@ -40,45 +41,59 @@ export function buildIntelligence(
       : undefined,
     rent_by_bhk: groupRentByBhk(observations),
     rent_by_furnishing: groupRentByFurnishing(observations, 2),
-    observations: u.map(o => {
-      let is_outlier = false;
-      let outlier_label: string | undefined = undefined;
+    observations: (() => {
+      // ── IQR precomputation: one pass per (bhk, furnishing) group ──
+      const groupBoundsMap = new Map<string, IqrBounds>();
+      const groupKey = (bhk: number, furnishing: string) => `${bhk}:${furnishing}`;
 
-      // Filter other observations for same BHK
-      const sameBhk = u.filter(other => other.bhk === o.bhk);
-      
-      // Minimum 3 observations to form a baseline
-      if (sameBhk.length >= 3) {
-        // Prefer same furnishing if available (at least 3)
-        let baselineObs = sameBhk.filter(other => other.furnishing === o.furnishing);
-        if (baselineObs.length < 3) {
-          baselineObs = sameBhk;
-        }
-
-        const baselineRents = baselineObs.map(other => other.rent_inr);
-        const baselineMedian = medianOf(baselineRents);
-
-        if (baselineMedian && baselineMedian > 0) {
-          const deviation = Math.abs(o.rent_inr - baselineMedian) / baselineMedian;
-          if (deviation >= 0.35) {
-            is_outlier = true;
-            outlier_label = "Unusual price";
-          }
-        }
+      // Collect rents per group
+      const groupRents = new Map<string, number[]>();
+      for (const o of u) {
+        const key = groupKey(o.bhk, o.furnishing);
+        const arr = groupRents.get(key) ?? [];
+        arr.push(o.rent_inr);
+        groupRents.set(key, arr);
       }
 
-      return {
-        id: o.id,
-        bhk: o.bhk,
-        rent_inr: o.rent_inr,
-        furnishing: o.furnishing,
-        deposit_months: o.deposit_months,
-        maintenance_inr: o.maintenance_inr,
-        is_gated: o.is_gated,
-        as_of_date: o.as_of_date,
-        ...(is_outlier ? { is_outlier, outlier_label } : {})
-      };
-    }),
+      // Compute IQR bounds once per group (only if >= 3 observations)
+      for (const [key, rents] of groupRents) {
+        const bounds = computeIqrBounds(rents);
+        if (bounds) groupBoundsMap.set(key, bounds);
+      }
+
+      // Evaluate each observation against its group's fences
+      return u.map(o => {
+        const bounds = groupBoundsMap.get(groupKey(o.bhk, o.furnishing));
+
+        let is_outlier = false;
+        let outlier_label: string | undefined = undefined;
+        let outlier_type: "low" | "high" | undefined = undefined;
+
+        if (bounds) {
+          if (o.rent_inr < bounds.lowerFence) {
+            is_outlier = true;
+            outlier_label = "Verify Price";
+            outlier_type = "low";
+          } else if (o.rent_inr > bounds.upperFence) {
+            is_outlier = true;
+            outlier_label = "Verify Price";
+            outlier_type = "high";
+          }
+        }
+
+        return {
+          id: o.id,
+          bhk: o.bhk,
+          rent_inr: o.rent_inr,
+          furnishing: o.furnishing,
+          deposit_months: o.deposit_months,
+          maintenance_inr: o.maintenance_inr,
+          is_gated: o.is_gated,
+          as_of_date: o.as_of_date,
+          ...(is_outlier ? { is_outlier, outlier_label } : {}),
+        };
+      });
+    })(),
     deposit_months_median: medianOf(u.map((o) => o.deposit_months)),
     maintenance_median: medianOf(u.map((o) => o.maintenance_inr)),
     bachelor: computeBachelorRealityScore(votes),

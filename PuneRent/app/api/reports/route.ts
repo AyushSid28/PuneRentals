@@ -3,6 +3,7 @@ import { getUserId } from "@/lib/auth";
 import { hasSupabase, supabaseAdmin } from "@/lib/db/client";
 import * as store from "@/lib/db/store";
 import { reportSchema } from "@/lib/validators/pin";
+import { logger } from "@/lib/logger";
 import { getRedisClient, invalidateCache } from "@/lib/db/redis";
 import { handleSupabaseError } from "@/lib/apiError";
 

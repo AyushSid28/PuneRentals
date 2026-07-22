@@ -115,20 +115,20 @@ create policy "public read votes"
 create policy "public read reviews"
   on public.reviews for select using (true);
 
--- Add foreign key to observations
+
 alter table public.rent_observations add column if not exists society_id uuid references public.societies(id);
 
--- Add foreign key to votes
+
 alter table public.bachelor_votes add column if not exists society_id uuid references public.societies(id);
 
--- Index for society_id on votes
+
 create index if not exists idx_votes_society_id on public.bachelor_votes(society_id);
 
--- Add foreign key to reviews
+
 alter table public.reviews add column if not exists society_id uuid references public.societies(id);
 
--- Index for society_id on reviews
+
 create index if not exists idx_reviews_society_id on public.reviews(society_id);
 
--- Add foreign key to reports (reference to observation already has observation_id, but add society reference for convenience)
+
 alter table public.reports add column if not exists society_id uuid references public.societies(id);
